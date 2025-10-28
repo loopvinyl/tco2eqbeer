@@ -1010,7 +1010,4 @@ st.markdown("""
 - Compostagem como alternativa sustentável
 - Redução significativa de emissões comparado ao aterro
 - Possibilidade de receita adicional com créditos de carbono
-
-
 """)
-[file content end]
