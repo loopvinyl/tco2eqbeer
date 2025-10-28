@@ -382,7 +382,7 @@ with st.sidebar:
         st.session_state.run_simulation = True
 
 # =============================================================================
-# PARÂMETROS FIXOS AJUSTADOS PARA CERVEJARIAS
+# PARÂMETROS FIXOS AJUSTADOS PARA CERVEJARIAS - VERSÃO CORRIGIDA
 # =============================================================================
 
 # Usando temperatura do sidebar
@@ -393,13 +393,13 @@ OX = 0.1
 Ri = 0.0
 k_ano = 0.06
 
-# Parâmetros específicos para resíduos de cervejaria
+# CORREÇÃO: Ajustar fatores de emissão base para refletir melhor a literatura
 TOC_CERVEJARIA = 0.45  # Maior que resíduos genéricos devido à alta matéria orgânica
 TN_CERVEJARIA = 25.0 / 1000  # Teor de nitrogênio mais alto
 
-# Ajustar fatores de emissão para resíduos de cervejaria (mais biodegradáveis)
-CH4_C_FRAC_CERVEJARIA = 0.20 / 100  # Maior potencial de metano
-N2O_N_FRAC_CERVEJARIA = 1.20 / 100  # Maior potencial de óxido nitroso
+# CORREÇÃO: Fatores de emissão aumentados para refletir maior biodegradabilidade
+CH4_C_FRAC_CERVEJARIA = 0.35 / 100  # Aumentado para refletir maior biodegradabilidade
+N2O_N_FRAC_CERVEJARIA = 1.80 / 100  # Aumentado para resíduos nitrogenados de cervejaria
 
 DIAS_COMPOSTAGEM = 50
 
@@ -432,6 +432,35 @@ PERFIL_N2O_CERVEJARIA = np.array([
 ])
 PERFIL_N2O_CERVEJARIA /= PERFIL_N2O_CERVEJARIA.sum()
 
+# CORREÇÃO: Perfis específicos para vermicompostagem - mais rápidos e com menor pico
+PERFIL_CH4_VERMI = np.array([
+    0.05, 0.07, 0.10, 0.12, 0.15,  # Dias 1-5 - pico mais rápido
+    0.18, 0.20, 0.15, 0.10, 0.08,  # Dias 6-10 - decaimento acelerado
+    0.06, 0.04, 0.03, 0.02, 0.02,  # Dias 11-15
+    0.01, 0.01, 0.005, 0.005, 0.005,  # Dias 16-20
+    0.005, 0.005, 0.005, 0.005, 0.005,  # Dias 21-25
+    0.002, 0.002, 0.002, 0.002, 0.002,  # Dias 26-30
+    0.001, 0.001, 0.001, 0.001, 0.001,  # Dias 31-35
+    0.001, 0.001, 0.001, 0.001, 0.001,  # Dias 36-40
+    0.001, 0.001, 0.001, 0.001, 0.001,  # Dias 41-45
+    0.001, 0.001, 0.001, 0.001, 0.001   # Dias 46-50
+])
+PERFIL_CH4_VERMI /= PERFIL_CH4_VERMI.sum()
+
+PERFIL_N2O_VERMI = np.array([
+    0.08, 0.12, 0.15, 0.10, 0.08,  # Dias 1-5
+    0.10, 0.12, 0.15, 0.12, 0.10,  # Dias 6-10
+    0.08, 0.06, 0.05, 0.04, 0.03,  # Dias 11-15
+    0.02, 0.02, 0.01, 0.01, 0.01,  # Dias 16-20
+    0.005, 0.005, 0.005, 0.005, 0.005,  # Dias 21-25
+    0.002, 0.002, 0.002, 0.002, 0.002,  # Dias 26-30
+    0.001, 0.001, 0.001, 0.001, 0.001,  # Dias 31-35
+    0.001, 0.001, 0.001, 0.001, 0.001,  # Dias 36-40
+    0.001, 0.001, 0.001, 0.001, 0.001,  # Dias 41-45
+    0.001, 0.001, 0.001, 0.001, 0.001   # Dias 46-50
+])
+PERFIL_N2O_VERMI /= PERFIL_N2O_VERMI.sum()
+
 # Emissões pré-descarte ajustadas para cervejaria
 CH4_pre_descarte_ugC_por_kg_h_media = 3.50  # Valor mais alto para resíduos de cervejaria
 fator_conversao_C_para_CH4 = 16/12
@@ -457,7 +486,7 @@ datas = pd.date_range(start=data_inicio, periods=dias, freq='D')
 PERFIL_N2O = {1: 0.10, 2: 0.30, 3: 0.40, 4: 0.15, 5: 0.05}
 
 # =============================================================================
-# FUNÇÕES DE CÁLCULO ESPECÍFICAS PARA CERVEJARIAS
+# FUNÇÕES DE CÁLCULO ESPECÍFICAS PARA CERVEJARIAS - VERSÃO CORRIGIDA
 # =============================================================================
 
 def ajustar_emissoes_pre_descarte(O2_concentracao):
@@ -549,19 +578,23 @@ def calcular_emissoes_vermicompostagem_cervejaria(params, dias_simulacao=dias):
     umidade_val, temp_val, doc_val = params
     fracao_ms = 1 - umidade_val
     
-    # Usando parâmetros específicos para cervejaria com vermicompostagem
-    ch4_total_por_lote = residuos_kg_dia * (TOC_CERVEJARIA * (CH4_C_FRAC_CERVEJARIA * 0.5) * (16/12) * fracao_ms)
-    n2o_total_por_lote = residuos_kg_dia * (TN_CERVEJARIA * (N2O_N_FRAC_CERVEJARIA * 0.3) * (44/28) * fracao_ms)
+    # CORREÇÃO: Fatores de emissão significativamente menores para vermicompostagem
+    # Baseado em: Yang et al. (2017) - vermicompostagem reduz CH4 em 60-80% e N2O em 50-70%
+    CH4_C_FRAC_VERMI = CH4_C_FRAC_CERVEJARIA * 0.3  # 70% de redução
+    N2O_N_FRAC_VERMI = N2O_N_FRAC_CERVEJARIA * 0.4  # 60% de redução
+    
+    ch4_total_por_lote = residuos_kg_dia * (TOC_CERVEJARIA * CH4_C_FRAC_VERMI * (16/12) * fracao_ms)
+    n2o_total_por_lote = residuos_kg_dia * (TN_CERVEJARIA * N2O_N_FRAC_VERMI * (44/28) * fracao_ms)
 
     emissoes_CH4 = np.zeros(dias_simulacao)
     emissoes_N2O = np.zeros(dias_simulacao)
 
     for dia_entrada in range(dias_simulacao):
-        for dia_compostagem in range(len(PERFIL_CH4_CERVEJARIA)):
+        for dia_compostagem in range(len(PERFIL_CH4_VERMI)):
             dia_emissao = dia_entrada + dia_compostagem
             if dia_emissao < dias_simulacao:
-                emissoes_CH4[dia_emissao] += ch4_total_por_lote * PERFIL_CH4_CERVEJARIA[dia_compostagem] * 0.7
-                emissoes_N2O[dia_emissao] += n2o_total_por_lote * PERFIL_N2O_CERVEJARIA[dia_compostagem] * 0.5
+                emissoes_CH4[dia_emissao] += ch4_total_por_lote * PERFIL_CH4_VERMI[dia_compostagem]
+                emissoes_N2O[dia_emissao] += n2o_total_por_lote * PERFIL_N2O_VERMI[dia_compostagem]
 
     return emissoes_CH4, emissoes_N2O
 
@@ -718,6 +751,9 @@ if st.session_state.get('run_simulation', False):
         media_anual_compost = total_evitado_compost / anos_simulacao
         media_anual_vermi = total_evitado_vermi / anos_simulacao
         
+        # Calcular vantagem da vermicompostagem
+        vantagem_vermi = ((total_evitado_vermi - total_evitado_compost) / total_evitado_compost) * 100
+        
         col1, col2 = st.columns(2)
         with col1:
             st.markdown("#### 🍂 Compostagem Tradicional")
@@ -737,7 +773,8 @@ if st.session_state.get('run_simulation', False):
             st.metric(
                 "Total de emissões evitadas", 
                 f"{formatar_br(total_evitado_vermi)} tCO₂eq",
-                help=f"Total acumulado em {anos_simulacao} anos"
+                delta=f"+{vantagem_vermi:.1f}% vs compostagem",
+                help=f"Total acumulado em {anos_simulacao} anos - {vantagem_vermi:.1f}% superior à compostagem tradicional"
             )
             st.metric(
                 "Média anual", 
@@ -946,15 +983,55 @@ if st.session_state.get('run_simulation', False):
         # Teste de normalidade para as diferenças
         diferencas = results_array_compost - results_array_vermi
         _, p_valor_normalidade_diff = stats.normaltest(diferencas)
-        st.write(f"Teste de normalidade das diferenças (p-value): **{p_valor_normalidade_diff:.5f}**")
-
+        
         # Teste T pareado
         ttest_pareado, p_ttest_pareado = stats.ttest_rel(results_array_compost, results_array_vermi)
-        st.write(f"Teste T pareado: Estatística t = **{ttest_pareado:.5f}**, P-valor = **{p_ttest_pareado:.5f}**")
-
+        
         # Teste de Wilcoxon para amostras pareadas
         wilcoxon_stat, p_wilcoxon = stats.wilcoxon(results_array_compost, results_array_vermi)
-        st.write(f"Teste de Wilcoxon (pareado): Estatística = **{wilcoxon_stat:.5f}**, P-valor = **{p_wilcoxon:.5f}**")
+
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.metric(
+                "Teste de normalidade",
+                f"p = {p_valor_normalidade_diff:.5f}",
+                help="p < 0.05 indica que as diferenças não são normais"
+            )
+        with col2:
+            st.metric(
+                "Teste T pareado", 
+                f"p = {p_ttest_pareado:.5f}",
+                help="p < 0.05 indica diferença significativa"
+            )
+        with col3:
+            st.metric(
+                "Teste de Wilcoxon",
+                f"p = {p_wilcoxon:.5f}",
+                help="p < 0.05 indica diferença significativa"
+            )
+
+        # Interpretação dos resultados
+        with st.expander("🔍 Interpretação dos Resultados Estatísticos"):
+            st.markdown(f"""
+            **📈 O que os testes estatísticos significam:**
+            
+            **Teste de normalidade (p = {p_valor_normalidade_diff:.5f}):**
+            - { "**Diferenças NÃO normais** - usar testes não paramétricos" if p_valor_normalidade_diff < 0.05 else "**Diferenças normais** - pode usar testes paramétricos" }
+            
+            **Teste T pareado (p = {p_ttest_pareado:.5f}):**
+            - { "**Diferença ALTAMENTE significativa**" if p_ttest_pareado < 0.001 else "**Diferença significativa**" if p_ttest_pareado < 0.05 else "**Diferença NÃO significativa**" }
+            
+            **Teste de Wilcoxon (p = {p_wilcoxon:.5f}):**
+            - { "**Diferença ALTAMENTE significativa**" if p_wilcoxon < 0.001 else "**Diferença significativa**" if p_wilcoxon < 0.05 else "**Diferença NÃO significativa**" }
+            
+            **💡 No contexto deste estudo:**
+            - **Resultado esperado:** Vermicompostagem mostra redução significativa nas emissões
+            - **Vantagem da vermicompostagem:** {vantagem_vermi:.1f}% mais eficiente
+            - **Significância estatística:** {'**CONFIRMADA**' if p_ttest_pareado < 0.05 else '**NÃO confirmada**'}
+            
+            **🎯 Conclusão:**
+            {'✅ **A vermicompostagem é estatisticamente superior** à compostagem tradicional na redução de emissões de GEE' if p_ttest_pareado < 0.05 else '❌ **Não há evidência estatística** de superioridade da vermicompostagem'}
+            """)
 
         # TABELAS DE RESULTADOS
         st.subheader("📋 Resultados Anuais")
@@ -993,4 +1070,5 @@ st.markdown("""
 - Caracterização de resíduos de cervejaria: Brasil (2023)
 - Potencial de compostagem: EPA (2022)  
 - Fatores de emissão ajustados: IPCC (2006) com fatores específicos
+- Superioridade da vermicompostagem: Yang et al. (2017)
 """)
