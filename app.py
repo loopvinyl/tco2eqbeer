@@ -294,6 +294,9 @@ with st.sidebar:
     st.info(f"**Resíduos estimados:** {residuos_kg_dia} kg/dia")
     st.caption(f"*Cálculo: ({producao_mensal_litros} L × {fator_residuos} kg/L) ÷ {dias_operacao_mes} dias = {residuos_kg_dia} kg/dia*")
     
+    # CORREÇÃO: Massa exposta agora é calculada automaticamente
+    massa_exposta_kg = residuos_kg_dia  # Toda a produção diária é exposta
+    
     st.subheader("📊 Composição dos Resíduos")
     
     # Composição dos resíduos da cervejaria
@@ -338,11 +341,14 @@ with st.sidebar:
     st.write(f"**DOCf calculado:** {formatar_br(docf_calculado)}")
     st.write(f"*(DOCf = 0,0147 × {temperatura} + 0,28)*")
     
-    # Parâmetros operacionais
-    massa_exposta_kg = st.slider("Massa exposta na frente de trabalho (kg)", 50, 200, 100, 10,
-                                help="Massa de resíduos exposta diariamente para tratamento")
+    # CORREÇÃO: Horas expostas agora é o único parâmetro operacional
+    st.subheader("⏰ Horas de Exposição")
     h_exposta = st.slider("Horas expostas por dia", 4, 24, 8, 1,
-                         help="Horas diárias de exposição dos resíduos")
+                         help="Horas diárias de exposição dos resíduos para tratamento")
+    
+    # Mostrar automaticamente a massa exposta (calculada)
+    st.info(f"**Massa exposta automaticamente calculada:** {massa_exposta_kg} kg/dia")
+    st.caption("*Baseado na produção diária de resíduos*")
     
     # Expander explicativo sobre os parâmetros
     with st.expander("ℹ️ Explicação dos Parâmetros da Cervejaria"):
@@ -355,6 +361,7 @@ with st.sidebar:
         - **Fator de resíduos:** {fator_residuos} kg/litro
         - **Resíduos estimados:** {residuos_kg_dia} kg/dia
         - **Cálculo:** ({producao_mensal_litros} L × {fator_residuos} kg/L) ÷ {dias_operacao_mes} dias = {residuos_kg_dia} kg/dia
+        - **Massa exposta:** {massa_exposta_kg} kg/dia (calculada automaticamente)
         - **Composição:** {percentual_bagaco}% bagaço + {percentual_levedura}% levedura
         
         **💧 Umidade:**
@@ -374,6 +381,10 @@ with st.sidebar:
         **📈 DOCf ({formatar_br(docf_calculado)}):**
         - **Fração do DOC que realmente decompõe**
         - **Calculado automaticamente:** DOCf = 0,0147 × Temperatura + 0,28
+        
+        **⏰ Horas de Exposição:**
+        - **Horas expostas:** {h_exposta} horas/dia
+        - **Fração do dia:** {h_exposta/24:.1%}
         
         **🔗 Características dos Resíduos de Cervejaria:**
         - Alta biodegradabilidade
