@@ -686,7 +686,7 @@ if st.session_state.get('run_simulation', False):
             )
         with col3:
             st.metric(
-                "Valor Vermicompostagem (Euro)", 
+                "Valor Compostagem em Reatores Com Minhocas (Euro)", 
                 f"{moeda} {formatar_br(valor_vermi_eur)}",
                 help=f"Baseado em {formatar_br(total_evitado_vermi)} tCO₂eq evitadas"
             )
@@ -707,7 +707,7 @@ if st.session_state.get('run_simulation', False):
             )
         with col3:
             st.metric(
-                "Valor Vermicompostagem (R$)", 
+                "Valor Compostagem em Reatores Com Minhocas (R$)", 
                 f"R$ {formatar_br(valor_vermi_brl)}",
                 help=f"Baseado em {formatar_br(total_evitado_vermi)} tCO₂eq evitadas"
             )
@@ -733,7 +733,7 @@ if st.session_state.get('run_simulation', False):
             )
 
         with col2:
-            st.markdown("#### 🐛 Vermicompostagem")
+            st.markdown("#### 🐛 Compostagem em Reatores Com Minhocas")
             st.metric(
                 "Total de emissões evitadas", 
                 f"{formatar_br(total_evitado_vermi)} tCO₂eq",
@@ -750,7 +750,7 @@ if st.session_state.get('run_simulation', False):
         df_evitadas_anual = pd.DataFrame({
             'Year': df_anual['Year'],
             'Compostagem Tradicional': df_anual['Emission reductions Compost (t CO₂eq)'],
-            'Vermicompostagem': df_anual['Emission reductions Vermi (t CO₂eq)']
+            'Compostagem em Reatores Com Minhocas': df_anual['Emission reductions Vermi (t CO₂eq)']
         })
 
         fig, ax = plt.subplots(figsize=(10, 6))
@@ -760,12 +760,12 @@ if st.session_state.get('run_simulation', False):
 
         ax.bar(x - bar_width/2, df_evitadas_anual['Compostagem Tradicional'], width=bar_width,
                 label='Compostagem Tradicional', edgecolor='black')
-        ax.bar(x + bar_width/2, df_evitadas_anual['Vermicompostagem'], width=bar_width,
-                label='Vermicompostagem', edgecolor='black', hatch='//')
+        ax.bar(x + bar_width/2, df_evitadas_anual['Compostagem em Reatores Com Minhocas'], width=bar_width,
+                label='Compostagem em Reatores Com Minhocas', edgecolor='black', hatch='//')
 
         # Adicionar valores formatados em cima das barras
         for i, (v1, v2) in enumerate(zip(df_evitadas_anual['Compostagem Tradicional'], 
-                                         df_evitadas_anual['Vermicompostagem'])):
+                                         df_evitadas_anual['Compostagem em Reatores Com Minhocas'])):
             ax.text(i - bar_width/2, v1 + max(v1, v2)*0.01, 
                     formatar_br(v1), ha='center', fontsize=9, fontweight='bold')
             ax.text(i + bar_width/2, v2 + max(v1, v2)*0.01, 
@@ -773,7 +773,7 @@ if st.session_state.get('run_simulation', False):
 
         ax.set_xlabel('Ano')
         ax.set_ylabel('Emissões Evitadas (t CO₂eq)')
-        ax.set_title('Comparação Anual das Emissões Evitadas: Compostagem vs Vermicompostagem')
+        ax.set_title('Comparação Anual das Emissões Evitadas: Compostagem Tradicional vs Compostagem em Reatores Com Minhocas')
         
         ax.set_xticks(x)
         ax.set_xticklabels(df_anual['Year'], fontsize=8)
@@ -791,11 +791,11 @@ if st.session_state.get('run_simulation', False):
         ax.plot(df['Data'], df['Total_Compost_tCO2eq_acum'], 'g-', 
                 label='Compostagem Tradicional', linewidth=2)
         ax.plot(df['Data'], df['Total_Vermi_tCO2eq_acum'], 'b-', 
-                label='Vermicompostagem', linewidth=2)
+                label='Compostagem em Reatores Com Minhocas', linewidth=2)
         ax.fill_between(df['Data'], df['Total_Compost_tCO2eq_acum'], df['Total_Aterro_tCO2eq_acum'],
                         color='lightgreen', alpha=0.5, label='Emissões Evitadas - Compostagem')
         ax.fill_between(df['Data'], df['Total_Vermi_tCO2eq_acum'], df['Total_Aterro_tCO2eq_acum'],
-                        color='lightblue', alpha=0.3, label='Emissões Evitadas - Vermicompostagem')
+                        color='lightblue', alpha=0.3, label='Emissões Evitadas - Compostagem em Reatores Com Minhocas')
         ax.set_title(f'Redução de Emissões em {anos_simulacao} Anos - Cervejaria')
         ax.set_xlabel('Ano')
         ax.set_ylabel('tCO₂eq Acumulado')
@@ -838,7 +838,7 @@ if st.session_state.get('run_simulation', False):
         st.pyplot(fig)
 
         # ANÁLISE DE SENSIBILIDADE - VERMICOMPOSTAGEM
-        st.subheader("🎯 Análise de Sensibilidade Global (Sobol) - Vermicompostagem")
+        st.subheader("🎯 Análise de Sensibilidade Global (Sobol) - Compostagem em Reatores Com Minhocas")
         
         problem_vermi = {
             'num_vars': 3,
@@ -864,7 +864,7 @@ if st.session_state.get('run_simulation', False):
 
         fig, ax = plt.subplots(figsize=(10, 6))
         sns.barplot(x='ST', y='Parâmetro', data=sensibilidade_df_vermi, palette='viridis', ax=ax)
-        ax.set_title('Sensibilidade Global dos Parâmetros - Vermicompostagem')
+        ax.set_title('Sensibilidade Global dos Parâmetros - Compostagem em Reatores Com Minhocas')
         ax.set_xlabel('Índice ST')
         ax.set_ylabel('')
         ax.grid(axis='x', linestyle='--', alpha=0.7)
@@ -906,7 +906,7 @@ if st.session_state.get('run_simulation', False):
         st.pyplot(fig)
 
         # ANÁLISE DE INCERTEZA - VERMICOMPOSTAGEM
-        st.subheader("🎲 Análise de Incerteza (Monte Carlo) - Vermicompostagem")
+        st.subheader("🎲 Análise de Incerteza (Monte Carlo) - Compostagem em Reatores Com Minhocas")
         
         def gerar_parametros_mc_vermi(n):
             np.random.seed(50)
@@ -932,7 +932,7 @@ if st.session_state.get('run_simulation', False):
                    label=f'Média: {formatar_br(media_vermi)} tCO₂eq')
         ax.axvline(intervalo_95_vermi[0], color='green', linestyle=':', label='IC 95%')
         ax.axvline(intervalo_95_vermi[1], color='green', linestyle=':')
-        ax.set_title('Distribuição das Emissões Evitadas - Vermicompostagem')
+        ax.set_title('Distribuição das Emissões Evitadas - Compostagem em Reatores Com Minhocas')
         ax.set_xlabel('Emissões Evitadas (tCO₂eq)')
         ax.set_ylabel('Frequência')
         ax.legend()
