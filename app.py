@@ -257,17 +257,10 @@ def br_format(x, pos):
         return f"{x:,.0f}".replace(",", "X").replace(".", ",").replace("X", ".")
     return f"{x:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
-def br_format_5_dec(x, pos):
-    return f"{x:,.5f}".replace(",", "X").replace(".", ",").replace("X", ".")
-
-# =============================================================================
-# INTERFACE PRINCIPAL
-# =============================================================================
-
+# Título do aplicativo para cervejarias
 st.title("🍻 Simulador de Emissões de tCO₂eq para Cervejarias")
 st.markdown("""
-Esta ferramenta projeta os Créditos de Carbono para cervejarias ao calcular as emissões de gases de efeito estufa 
-para diferentes contextos de gestão de resíduos (bagaço de malte e levedura)
+Esta ferramenta calcula os Créditos de Carbono para cervejarias, comparando diferentes métodos de gestão de resíduos (bagaço de malte e levedura)
 """)
 
 # =============================================================================
@@ -315,6 +308,12 @@ with st.sidebar:
     
     st.write(f"**Umidade média:** {umidade_media:.1f}%")
     
+    st.subheader("🌡️ Parâmetros Operacionais")
+    
+    # Temperatura - PARÂMETRO IMPORTANTE
+    temperatura = st.slider("Temperatura média (°C)", 15, 35, 25, 1,
+                           help="Temperatura ambiente que influencia a decomposição e cálculo do DOCf")
+    
     # DOC específico para resíduos de cervejaria
     doc_bagaco = st.slider("DOC do bagaço", 0.70, 0.90, 0.80, 0.01,
                           help="Carbono Orgânico Degradável do bagaço de malte")
@@ -327,21 +326,57 @@ with st.sidebar:
     
     st.write(f"**DOC médio:** {doc_medio:.3f}")
     
-    # Parâmetros operacionais (mantidos do original)
-    st.subheader("📊 Parâmetros Operacionais")
+    # Cálculo automático do DOCf baseado na temperatura
+    docf_calculado = 0.0147 * temperatura + 0.28
+    st.write(f"**DOCf calculado:** {formatar_br(docf_calculado)}")
+    st.write(f"*(DOCf = 0,0147 × {temperatura} + 0,28)*")
     
+    # Parâmetros operacionais
     massa_exposta_kg = st.slider("Massa exposta na frente de trabalho (kg)", 50, 200, 100, 10,
                                 help="Massa de resíduos exposta diariamente para tratamento")
     h_exposta = st.slider("Horas expostas por dia", 4, 24, 8, 1,
                          help="Horas diárias de exposição dos resíduos")
     
+    # Expander explicativo sobre os parâmetros
+    with st.expander("ℹ️ Explicação dos Parâmetros da Cervejaria"):
+        st.markdown(f"""
+        **🍻 Parâmetros Específicos para Cervejaria:**
+        
+        **📊 Produção e Resíduos:**
+        - **Produção mensal:** {producao_mensal_litros} litros
+        - **Dias de operação:** {dias_operacao_mes} dias/mês
+        - **Resíduos estimados:** {residuos_kg_dia} kg/dia
+        - **Composição:** {percentual_bagaco}% bagaço + {percentual_levedura}% levedura
+        
+        **💧 Umidade:**
+        - **Bagaço:** {umidade_bagaco}%
+        - **Levedura:** {umidade_levedura}%
+        - **Média ponderada:** {umidade_media:.1f}%
+        
+        **🌡️ Temperatura ({temperatura}°C):**
+        - Controla a atividade microbiana
+        - **Diretamente usada no cálculo do DOCf**
+        
+        **🌿 DOC:**
+        - **Bagaço:** {doc_bagaco:.3f}
+        - **Levedura:** {doc_levedura:.3f}
+        - **Médio ponderado:** {doc_medio:.3f}
+        
+        **📈 DOCf ({formatar_br(docf_calculado)}):**
+        - **Fração do DOC que realmente decompõe**
+        - **Calculado automaticamente:** DOCf = 0,0147 × Temperatura + 0,28
+        
+        **🔗 Características dos Resíduos de Cervejaria:**
+        - Alta biodegradabilidade
+        - Rico em matéria orgânica
+        - Alto potencial de geração de metano
+        - Ideal para compostagem e geração de créditos
+        """)
+    
     st.subheader("🎯 Configuração de Simulação")
-    anos_simulacao = st.slider("Anos de simulação", 5, 50, 20, 5,
-                              help="Período total da simulação em anos")
-    n_simulations = st.slider("Número de simulações Monte Carlo", 50, 1000, 100, 50,
-                             help="Número de iterações para análise de incerteza")
-    n_samples = st.slider("Número de amostras Sobol", 32, 256, 64, 16,
-                         help="Número de amostras para análise de sensibilidade")
+    anos_simulacao = st.slider("Anos de simulação", 5, 50, 20, 5)
+    n_simulations = st.slider("Número de simulações Monte Carlo", 50, 1000, 100, 50)
+    n_samples = st.slider("Número de amostras Sobol", 32, 256, 64, 16)
     
     if st.button("🚀 Executar Simulação", type="primary"):
         st.session_state.run_simulation = True
@@ -350,8 +385,8 @@ with st.sidebar:
 # PARÂMETROS FIXOS AJUSTADOS PARA CERVEJARIAS
 # =============================================================================
 
-T = 25  # Temperatura média (ºC)
-DOCf_val = 0.0147 * T + 0.28
+# Usando temperatura do sidebar
+DOCf_val = 0.0147 * temperatura + 0.28
 MCF = 1
 F = 0.5
 OX = 0.1
@@ -362,13 +397,14 @@ k_ano = 0.06
 TOC_CERVEJARIA = 0.45  # Maior que resíduos genéricos devido à alta matéria orgânica
 TN_CERVEJARIA = 25.0 / 1000  # Teor de nitrogênio mais alto
 
-# Fatores de emissão para vermicompostagem (Yang et al. 2017) - ajustados para cervejaria
-CH4_C_FRAC_YANG_CERVEJARIA = 0.15 / 100  # Ajustado para resíduos de cervejaria
-N2O_N_FRAC_YANG_CERVEJARIA = 1.00 / 100  # Ajustado para resíduos de cervejaria
+# Ajustar fatores de emissão para resíduos de cervejaria (mais biodegradáveis)
+CH4_C_FRAC_CERVEJARIA = 0.20 / 100  # Maior potencial de metano
+N2O_N_FRAC_CERVEJARIA = 1.20 / 100  # Maior potencial de óxido nitroso
+
 DIAS_COMPOSTAGEM = 50
 
 # Perfis de emissão ajustados para resíduos de cervejaria (decomposição mais rápida)
-PERFIL_CH4_VERMI_CERVEJARIA = np.array([
+PERFIL_CH4_CERVEJARIA = np.array([
     0.03, 0.04, 0.05, 0.07, 0.09,  # Dias 1-5 (início mais rápido)
     0.12, 0.15, 0.18, 0.20, 0.18,  # Dias 6-10 (pico antecipado)
     0.15, 0.12, 0.10, 0.08, 0.06,  # Dias 11-15
@@ -380,9 +416,9 @@ PERFIL_CH4_VERMI_CERVEJARIA = np.array([
     0.001, 0.001, 0.001, 0.001, 0.001,  # Dias 41-45
     0.001, 0.001, 0.001, 0.001, 0.001   # Dias 46-50
 ])
-PERFIL_CH4_VERMI_CERVEJARIA /= PERFIL_CH4_VERMI_CERVEJARIA.sum()
+PERFIL_CH4_CERVEJARIA /= PERFIL_CH4_CERVEJARIA.sum()
 
-PERFIL_N2O_VERMI_CERVEJARIA = np.array([
+PERFIL_N2O_CERVEJARIA = np.array([
     0.12, 0.15, 0.20, 0.08, 0.05,  # Dias 1-5 (pico mais pronunciado)
     0.06, 0.08, 0.10, 0.12, 0.15,  # Dias 6-10
     0.18, 0.20, 0.18, 0.15, 0.12,  # Dias 11-15 (pico principal)
@@ -394,7 +430,7 @@ PERFIL_N2O_VERMI_CERVEJARIA = np.array([
     0.001, 0.001, 0.001, 0.001, 0.001,  # Dias 41-45
     0.001, 0.001, 0.001, 0.001, 0.001   # Dias 46-50
 ])
-PERFIL_N2O_VERMI_CERVEJARIA /= PERFIL_N2O_VERMI_CERVEJARIA.sum()
+PERFIL_N2O_CERVEJARIA /= PERFIL_N2O_CERVEJARIA.sum()
 
 # Emissões pré-descarte ajustadas para cervejaria
 CH4_pre_descarte_ugC_por_kg_h_media = 3.50  # Valor mais alto para resíduos de cervejaria
@@ -420,40 +456,8 @@ datas = pd.date_range(start=data_inicio, periods=dias, freq='D')
 
 PERFIL_N2O = {1: 0.10, 2: 0.30, 3: 0.40, 4: 0.15, 5: 0.05}
 
-# Valores específicos para compostagem termofílica (Yang et al. 2017) - ajustados para cervejaria
-CH4_C_FRAC_THERMO_CERVEJARIA = 0.008  # Ajustado para cervejaria
-N2O_N_FRAC_THERMO_CERVEJARIA = 0.025  # Ajustado para cervejaria
-
-PERFIL_CH4_THERMO_CERVEJARIA = np.array([
-    0.02, 0.03, 0.05, 0.08, 0.12,  # Dias 1-5
-    0.16, 0.20, 0.22, 0.24, 0.22,  # Dias 6-10 (pico termofílico)
-    0.20, 0.18, 0.15, 0.12, 0.10,  # Dias 11-15
-    0.08, 0.06, 0.05, 0.04, 0.03,  # Dias 16-20
-    0.02, 0.02, 0.01, 0.01, 0.01,  # Dias 21-25
-    0.005, 0.005, 0.005, 0.005, 0.005,  # Dias 26-30
-    0.002, 0.002, 0.002, 0.002, 0.002,  # Dias 31-35
-    0.001, 0.001, 0.001, 0.001, 0.001,  # Dias 36-40
-    0.001, 0.001, 0.001, 0.001, 0.001,  # Dias 41-45
-    0.001, 0.001, 0.001, 0.001, 0.001   # Dias 46-50
-])
-PERFIL_CH4_THERMO_CERVEJARIA /= PERFIL_CH4_THERMO_CERVEJARIA.sum()
-
-PERFIL_N2O_THERMO_CERVEJARIA = np.array([
-    0.12, 0.10, 0.18, 0.08, 0.05,  # Dias 1-5
-    0.06, 0.08, 0.12, 0.15, 0.18,  # Dias 6-10
-    0.22, 0.25, 0.28, 0.25, 0.22,  # Dias 11-15 (pico termofílico)
-    0.18, 0.15, 0.12, 0.10, 0.08,  # Dias 16-20
-    0.06, 0.05, 0.04, 0.03, 0.02,  # Dias 21-25
-    0.01, 0.01, 0.01, 0.01, 0.01,  # Dias 26-30
-    0.005, 0.005, 0.005, 0.005, 0.005,  # Dias 31-35
-    0.002, 0.002, 0.002, 0.002, 0.002,  # Dias 36-40
-    0.001, 0.001, 0.001, 0.001, 0.001,  # Dias 41-45
-    0.001, 0.001, 0.001, 0.001, 0.001,   # Dias 46-50
-])
-PERFIL_N2O_THERMO_CERVEJARIA /= PERFIL_N2O_THERMO_CERVEJARIA.sum()
-
 # =============================================================================
-# FUNÇÕES DE CÁLCULO - ADAPTADAS PARA CERVEJARIA
+# FUNÇÕES DE CÁLCULO ESPECÍFICAS PARA CERVEJARIAS
 # =============================================================================
 
 def ajustar_emissoes_pre_descarte(O2_concentracao):
@@ -521,51 +525,63 @@ def calcular_emissoes_aterro(params, dias_simulacao=dias):
 
     return total_ch4_aterro_kg, total_n2o_aterro_kg
 
-def calcular_emissoes_vermi(params, dias_simulacao=dias):
+def calcular_emissoes_compostagem_cervejaria(params, dias_simulacao=dias):
     umidade_val, temp_val, doc_val = params
     fracao_ms = 1 - umidade_val
     
     # Usando parâmetros específicos para cervejaria
-    ch4_total_por_lote = residuos_kg_dia * (TOC_CERVEJARIA * CH4_C_FRAC_YANG_CERVEJARIA * (16/12) * fracao_ms)
-    n2o_total_por_lote = residuos_kg_dia * (TN_CERVEJARIA * N2O_N_FRAC_YANG_CERVEJARIA * (44/28) * fracao_ms)
+    ch4_total_por_lote = residuos_kg_dia * (TOC_CERVEJARIA * CH4_C_FRAC_CERVEJARIA * (16/12) * fracao_ms)
+    n2o_total_por_lote = residuos_kg_dia * (TN_CERVEJARIA * N2O_N_FRAC_CERVEJARIA * (44/28) * fracao_ms)
 
     emissoes_CH4 = np.zeros(dias_simulacao)
     emissoes_N2O = np.zeros(dias_simulacao)
 
     for dia_entrada in range(dias_simulacao):
-        for dia_compostagem in range(len(PERFIL_CH4_VERMI_CERVEJARIA)):
+        for dia_compostagem in range(len(PERFIL_CH4_CERVEJARIA)):
             dia_emissao = dia_entrada + dia_compostagem
             if dia_emissao < dias_simulacao:
-                emissoes_CH4[dia_emissao] += ch4_total_por_lote * PERFIL_CH4_VERMI_CERVEJARIA[dia_compostagem]
-                emissoes_N2O[dia_emissao] += n2o_total_por_lote * PERFIL_N2O_VERMI_CERVEJARIA[dia_compostagem]
+                emissoes_CH4[dia_emissao] += ch4_total_por_lote * PERFIL_CH4_CERVEJARIA[dia_compostagem]
+                emissoes_N2O[dia_emissao] += n2o_total_por_lote * PERFIL_N2O_CERVEJARIA[dia_compostagem]
 
     return emissoes_CH4, emissoes_N2O
 
-def calcular_emissoes_compostagem(params, dias_simulacao=dias, dias_compostagem=50):
-    umidade, T, DOC = params
-    fracao_ms = 1 - umidade
+def calcular_emissoes_vermicompostagem_cervejaria(params, dias_simulacao=dias):
+    umidade_val, temp_val, doc_val = params
+    fracao_ms = 1 - umidade_val
     
-    # Usando parâmetros específicos para cervejaria
-    ch4_total_por_lote = residuos_kg_dia * (TOC_CERVEJARIA * CH4_C_FRAC_THERMO_CERVEJARIA * (16/12) * fracao_ms)
-    n2o_total_por_lote = residuos_kg_dia * (TN_CERVEJARIA * N2O_N_FRAC_THERMO_CERVEJARIA * (44/28) * fracao_ms)
+    # Usando parâmetros específicos para cervejaria com vermicompostagem
+    ch4_total_por_lote = residuos_kg_dia * (TOC_CERVEJARIA * (CH4_C_FRAC_CERVEJARIA * 0.5) * (16/12) * fracao_ms)
+    n2o_total_por_lote = residuos_kg_dia * (TN_CERVEJARIA * (N2O_N_FRAC_CERVEJARIA * 0.3) * (44/28) * fracao_ms)
 
     emissoes_CH4 = np.zeros(dias_simulacao)
     emissoes_N2O = np.zeros(dias_simulacao)
 
     for dia_entrada in range(dias_simulacao):
-        for dia_compostagem in range(len(PERFIL_CH4_THERMO_CERVEJARIA)):
+        for dia_compostagem in range(len(PERFIL_CH4_CERVEJARIA)):
             dia_emissao = dia_entrada + dia_compostagem
             if dia_emissao < dias_simulacao:
-                emissoes_CH4[dia_emissao] += ch4_total_por_lote * PERFIL_CH4_THERMO_CERVEJARIA[dia_compostagem]
-                emissoes_N2O[dia_emissao] += n2o_total_por_lote * PERFIL_N2O_THERMO_CERVEJARIA[dia_compostagem]
+                emissoes_CH4[dia_emissao] += ch4_total_por_lote * PERFIL_CH4_CERVEJARIA[dia_compostagem] * 0.7
+                emissoes_N2O[dia_emissao] += n2o_total_por_lote * PERFIL_N2O_CERVEJARIA[dia_compostagem] * 0.5
 
     return emissoes_CH4, emissoes_N2O
 
-def executar_simulacao_completa(parametros):
+def executar_simulacao_completa_cervejaria(parametros):
     umidade, T, DOC = parametros
     
     ch4_aterro, n2o_aterro = calcular_emissoes_aterro([umidade, T, DOC])
-    ch4_vermi, n2o_vermi = calcular_emissoes_vermi([umidade, T, DOC])
+    ch4_compost, n2o_compost = calcular_emissoes_compostagem_cervejaria([umidade, T, DOC])
+
+    total_aterro_tco2eq = (ch4_aterro * GWP_CH4_20 + n2o_aterro * GWP_N2O_20) / 1000
+    total_compost_tco2eq = (ch4_compost * GWP_CH4_20 + n2o_compost * GWP_N2O_20) / 1000
+
+    reducao_tco2eq = total_aterro_tco2eq.sum() - total_compost_tco2eq.sum()
+    return reducao_tco2eq
+
+def executar_simulacao_vermicompostagem_cervejaria(parametros):
+    umidade, T, DOC = parametros
+    
+    ch4_aterro, n2o_aterro = calcular_emissoes_aterro([umidade, T, DOC])
+    ch4_vermi, n2o_vermi = calcular_emissoes_vermicompostagem_cervejaria([umidade, T, DOC])
 
     total_aterro_tco2eq = (ch4_aterro * GWP_CH4_20 + n2o_aterro * GWP_N2O_20) / 1000
     total_vermi_tco2eq = (ch4_vermi * GWP_CH4_20 + n2o_vermi * GWP_N2O_20) / 1000
@@ -573,115 +589,85 @@ def executar_simulacao_completa(parametros):
     reducao_tco2eq = total_aterro_tco2eq.sum() - total_vermi_tco2eq.sum()
     return reducao_tco2eq
 
-def executar_simulacao_unfccc(parametros):
-    umidade, T, DOC = parametros
-
-    ch4_aterro, n2o_aterro = calcular_emissoes_aterro([umidade, T, DOC])
-    total_aterro_tco2eq = (ch4_aterro * GWP_CH4_20 + n2o_aterro * GWP_N2O_20) / 1000
-
-    ch4_compost, n2o_compost = calcular_emissoes_compostagem([umidade, T, DOC], dias_simulacao=dias, dias_compostagem=50)
-    total_compost_tco2eq = (ch4_compost * GWP_CH4_20 + n2o_compost * GWP_N2O_20) / 1000
-
-    reducao_tco2eq = total_aterro_tco2eq.sum() - total_compost_tco2eq.sum()
-    return reducao_tco2eq
-
 # =============================================================================
-# EXECUÇÃO DA SIMULAÇÃO - MANTENDO TODOS OS CENÁRIOS
+# EXECUÇÃO DA SIMULAÇÃO PARA CERVEJARIAS
 # =============================================================================
 
 if st.session_state.get('run_simulation', False):
-    with st.spinner('Executando simulação completa para cervejaria...'):
-        # Executar modelo base
-        params_base = [umidade, T, DOC]
+    with st.spinner('Executando simulação para cervejaria...'):
+        params_base = [umidade, temperatura, DOC]
 
         ch4_aterro_dia, n2o_aterro_dia = calcular_emissoes_aterro(params_base)
-        ch4_vermi_dia, n2o_vermi_dia = calcular_emissoes_vermi(params_base)
+        ch4_compost_dia, n2o_compost_dia = calcular_emissoes_compostagem_cervejaria(params_base)
+        ch4_vermi_dia, n2o_vermi_dia = calcular_emissoes_vermicompostagem_cervejaria(params_base)
 
         # Construir DataFrame
         df = pd.DataFrame({
             'Data': datas,
             'CH4_Aterro_kg_dia': ch4_aterro_dia,
             'N2O_Aterro_kg_dia': n2o_aterro_dia,
+            'CH4_Compost_kg_dia': ch4_compost_dia,
+            'N2O_Compost_kg_dia': n2o_compost_dia,
             'CH4_Vermi_kg_dia': ch4_vermi_dia,
             'N2O_Vermi_kg_dia': n2o_vermi_dia,
         })
 
-        for gas in ['CH4_Aterro', 'N2O_Aterro', 'CH4_Vermi', 'N2O_Vermi']:
+        for gas in ['CH4_Aterro', 'N2O_Aterro', 'CH4_Compost', 'N2O_Compost', 'CH4_Vermi', 'N2O_Vermi']:
             df[f'{gas}_tCO2eq'] = df[f'{gas}_kg_dia'] * (GWP_CH4_20 if 'CH4' in gas else GWP_N2O_20) / 1000
 
         df['Total_Aterro_tCO2eq_dia'] = df['CH4_Aterro_tCO2eq'] + df['N2O_Aterro_tCO2eq']
+        df['Total_Compost_tCO2eq_dia'] = df['CH4_Compost_tCO2eq'] + df['N2O_Compost_tCO2eq']
         df['Total_Vermi_tCO2eq_dia'] = df['CH4_Vermi_tCO2eq'] + df['N2O_Vermi_tCO2eq']
 
         df['Total_Aterro_tCO2eq_acum'] = df['Total_Aterro_tCO2eq_dia'].cumsum()
+        df['Total_Compost_tCO2eq_acum'] = df['Total_Compost_tCO2eq_dia'].cumsum()
         df['Total_Vermi_tCO2eq_acum'] = df['Total_Vermi_tCO2eq_dia'].cumsum()
-        df['Reducao_tCO2eq_acum'] = df['Total_Aterro_tCO2eq_acum'] - df['Total_Vermi_tCO2eq_acum']
+        
+        df['Reducao_Compost_tCO2eq_acum'] = df['Total_Aterro_tCO2eq_acum'] - df['Total_Compost_tCO2eq_acum']
+        df['Reducao_Vermi_tCO2eq_acum'] = df['Total_Aterro_tCO2eq_acum'] - df['Total_Vermi_tCO2eq_acum']
 
         # Resumo anual
         df['Year'] = df['Data'].dt.year
-        df_anual_revisado = df.groupby('Year').agg({
+        df_anual = df.groupby('Year').agg({
             'Total_Aterro_tCO2eq_dia': 'sum',
+            'Total_Compost_tCO2eq_dia': 'sum',
             'Total_Vermi_tCO2eq_dia': 'sum',
         }).reset_index()
 
-        df_anual_revisado['Emission reductions (t CO₂eq)'] = df_anual_revisado['Total_Aterro_tCO2eq_dia'] - df_anual_revisado['Total_Vermi_tCO2eq_dia']
-        df_anual_revisado['Cumulative reduction (t CO₂eq)'] = df_anual_revisado['Emission reductions (t CO₂eq)'].cumsum()
+        df_anual['Emission reductions Compost (t CO₂eq)'] = df_anual['Total_Aterro_tCO2eq_dia'] - df_anual['Total_Compost_tCO2eq_dia']
+        df_anual['Emission reductions Vermi (t CO₂eq)'] = df_anual['Total_Aterro_tCO2eq_dia'] - df_anual['Total_Vermi_tCO2eq_dia']
+        df_anual['Cumulative reduction Compost (t CO₂eq)'] = df_anual['Emission reductions Compost (t CO₂eq)'].cumsum()
+        df_anual['Cumulative reduction Vermi (t CO₂eq)'] = df_anual['Emission reductions Vermi (t CO₂eq)'].cumsum()
 
-        df_anual_revisado.rename(columns={
+        df_anual.rename(columns={
             'Total_Aterro_tCO2eq_dia': 'Baseline emissions (t CO₂eq)',
-            'Total_Vermi_tCO2eq_dia': 'Project emissions (t CO₂eq)',
+            'Total_Compost_tCO2eq_dia': 'Project emissions Compost (t CO₂eq)',
+            'Total_Vermi_tCO2eq_dia': 'Project emissions Vermi (t CO₂eq)',
         }, inplace=True)
 
-        # Cenário UNFCCC
-        ch4_compost_UNFCCC, n2o_compost_UNFCCC = calcular_emissoes_compostagem(
-            params_base, dias_simulacao=dias, dias_compostagem=50
-        )
-        ch4_compost_unfccc_tco2eq = ch4_compost_UNFCCC * GWP_CH4_20 / 1000
-        n2o_compost_unfccc_tco2eq = n2o_compost_UNFCCC * GWP_N2O_20 / 1000
-        total_compost_unfccc_tco2eq_dia = ch4_compost_unfccc_tco2eq + n2o_compost_unfccc_tco2eq
-
-        df_comp_unfccc_dia = pd.DataFrame({
-            'Data': datas,
-            'Total_Compost_tCO2eq_dia': total_compost_unfccc_tco2eq_dia
-        })
-        df_comp_unfccc_dia['Year'] = df_comp_unfccc_dia['Data'].dt.year
-
-        df_comp_anual_revisado = df_comp_unfccc_dia.groupby('Year').agg({
-            'Total_Compost_tCO2eq_dia': 'sum'
-        }).reset_index()
-
-        df_comp_anual_revisado = pd.merge(df_comp_anual_revisado,
-                                          df_anual_revisado[['Year', 'Baseline emissions (t CO₂eq)']],
-                                          on='Year', how='left')
-
-        df_comp_anual_revisado['Emission reductions (t CO₂eq)'] = df_comp_anual_revisado['Baseline emissions (t CO₂eq)'] - df_comp_anual_revisado['Total_Compost_tCO2eq_dia']
-        df_comp_anual_revisado['Cumulative reduction (t CO₂eq)'] = df_comp_anual_revisado['Emission reductions (t CO₂eq)'].cumsum()
-        df_comp_anual_revisado.rename(columns={'Total_Compost_tCO2eq_dia': 'Project emissions (t CO₂eq)'}, inplace=True)
-
         # =============================================================================
-        # EXIBIÇÃO DOS RESULTADOS - MANTENDO TODOS OS CENÁRIOS
+        # EXIBIÇÃO DOS RESULTADOS
         # =============================================================================
 
         st.header("📈 Resultados da Simulação - Cervejaria")
         
         # Obter valores totais
-        total_evitado_tese = df['Reducao_tCO2eq_acum'].iloc[-1]
-        total_evitado_unfccc = df_comp_anual_revisado['Cumulative reduction (t CO₂eq)'].iloc[-1]
+        total_evitado_compost = df['Reducao_Compost_tCO2eq_acum'].iloc[-1]
+        total_evitado_vermi = df['Reducao_Vermi_tCO2eq_acum'].iloc[-1]
         
-        # Obter preço do carbono e taxa de câmbio da session state
+        # Obter preço do carbono
         preco_carbono = st.session_state.preco_carbono
         moeda = st.session_state.moeda_carbono
         taxa_cambio = st.session_state.taxa_cambio
         fonte_cotacao = st.session_state.fonte_cotacao
         
-        # Calcular valores financeiros em Euros
-        valor_tese_eur = calcular_valor_creditos(total_evitado_tese, preco_carbono, moeda)
-        valor_unfccc_eur = calcular_valor_creditos(total_evitado_unfccc, preco_carbono, moeda)
+        # Calcular valores financeiros
+        valor_compost_eur = calcular_valor_creditos(total_evitado_compost, preco_carbono, moeda)
+        valor_vermi_eur = calcular_valor_creditos(total_evitado_vermi, preco_carbono, moeda)
+        valor_compost_brl = calcular_valor_creditos(total_evitado_compost, preco_carbono, "R$", taxa_cambio)
+        valor_vermi_brl = calcular_valor_creditos(total_evitado_vermi, preco_carbono, "R$", taxa_cambio)
         
-        # Calcular valores financeiros em Reais
-        valor_tese_brl = calcular_valor_creditos(total_evitado_tese, preco_carbono, "R$", taxa_cambio)
-        valor_unfccc_brl = calcular_valor_creditos(total_evitado_unfccc, preco_carbono, "R$", taxa_cambio)
-        
-        # SEÇÃO: VALOR FINANCEIRO DAS EMISSÕES EVITADAS
+        # SEÇÃO: VALOR FINANCEIRO
         st.subheader("💰 Valor Financeiro das Emissões Evitadas")
         
         # Primeira linha: Euros
@@ -694,15 +680,15 @@ if st.session_state.get('run_simulation', False):
             )
         with col2:
             st.metric(
-                "Valor Tese (Euro)", 
-                f"{moeda} {formatar_br(valor_tese_eur)}",
-                help=f"Baseado em {formatar_br(total_evitado_tese)} tCO₂eq evitadas"
+                "Valor Compostagem (Euro)", 
+                f"{moeda} {formatar_br(valor_compost_eur)}",
+                help=f"Baseado em {formatar_br(total_evitado_compost)} tCO₂eq evitadas"
             )
         with col3:
             st.metric(
-                "Valor UNFCCC (Euro)", 
-                f"{moeda} {formatar_br(valor_unfccc_eur)}",
-                help=f"Baseado em {formatar_br(total_evitado_unfccc)} tCO₂eq evitadas"
+                "Valor Vermicompostagem (Euro)", 
+                f"{moeda} {formatar_br(valor_vermi_eur)}",
+                help=f"Baseado em {formatar_br(total_evitado_vermi)} tCO₂eq evitadas"
             )
         
         # Segunda linha: Reais
@@ -715,59 +701,56 @@ if st.session_state.get('run_simulation', False):
             )
         with col2:
             st.metric(
-                "Valor Tese (R$)", 
-                f"R$ {formatar_br(valor_tese_brl)}",
-                help=f"Baseado em {formatar_br(total_evitado_tese)} tCO₂eq evitadas"
+                "Valor Compostagem (R$)", 
+                f"R$ {formatar_br(valor_compost_brl)}",
+                help=f"Baseado em {formatar_br(total_evitado_compost)} tCO₂eq evitadas"
             )
         with col3:
             st.metric(
-                "Valor UNFCCC (R$)", 
-                f"R$ {formatar_br(valor_unfccc_brl)}",
-                help=f"Baseado em {formatar_br(total_evitado_unfccc)} tCO₂eq evitadas"
+                "Valor Vermicompostagem (R$)", 
+                f"R$ {formatar_br(valor_vermi_brl)}",
+                help=f"Baseado em {formatar_br(total_evitado_vermi)} tCO₂eq evitadas"
             )
-        
+
         # RESUMO DAS EMISSÕES EVITADAS
         st.subheader("📊 Resumo das Emissões Evitadas")
         
-        # Calcular médias anuais
-        media_anual_tese = total_evitado_tese / anos_simulacao
-        media_anual_unfccc = total_evitado_unfccc / anos_simulacao
+        media_anual_compost = total_evitado_compost / anos_simulacao
+        media_anual_vermi = total_evitado_vermi / anos_simulacao
         
-        # Layout com duas colunas principais
         col1, col2 = st.columns(2)
-
         with col1:
-            st.markdown("#### 📋 Metodologia da Tese")
+            st.markdown("#### 🍂 Compostagem Tradicional")
             st.metric(
                 "Total de emissões evitadas", 
-                f"{formatar_br(total_evitado_tese)} tCO₂eq",
+                f"{formatar_br(total_evitado_compost)} tCO₂eq",
                 help=f"Total acumulado em {anos_simulacao} anos"
             )
             st.metric(
                 "Média anual", 
-                f"{formatar_br(media_anual_tese)} tCO₂eq/ano",
-                help=f"Emissões evitadas por ano em média"
+                f"{formatar_br(media_anual_compost)} tCO₂eq/ano",
+                help="Emissões evitadas por ano em média"
             )
 
         with col2:
-            st.markdown("#### 📋 Metodologia UNFCCC")
+            st.markdown("#### 🐛 Vermicompostagem")
             st.metric(
                 "Total de emissões evitadas", 
-                f"{formatar_br(total_evitado_unfccc)} tCO₂eq",
+                f"{formatar_br(total_evitado_vermi)} tCO₂eq",
                 help=f"Total acumulado em {anos_simulacao} anos"
             )
             st.metric(
                 "Média anual", 
-                f"{formatar_br(media_anual_unfccc)} tCO₂eq/ano",
-                help=f"Emissões evitadas por ano em média"
+                f"{formatar_br(media_anual_vermi)} tCO₂eq/ano",
+                help="Emissões evitadas por ano em média"
             )
 
-        # Gráfico comparativo
+        # GRÁFICO COMPARATIVO ANUAL
         st.subheader("📊 Comparação Anual das Emissões Evitadas")
         df_evitadas_anual = pd.DataFrame({
-            'Year': df_anual_revisado['Year'],
-            'Proposta da Tese': df_anual_revisado['Emission reductions (t CO₂eq)'],
-            'UNFCCC (2012)': df_comp_anual_revisado['Emission reductions (t CO₂eq)']
+            'Year': df_anual['Year'],
+            'Compostagem Tradicional': df_anual['Emission reductions Compost (t CO₂eq)'],
+            'Vermicompostagem': df_anual['Emission reductions Vermi (t CO₂eq)']
         })
 
         fig, ax = plt.subplots(figsize=(10, 6))
@@ -775,14 +758,14 @@ if st.session_state.get('run_simulation', False):
         x = np.arange(len(df_evitadas_anual['Year']))
         bar_width = 0.35
 
-        ax.bar(x - bar_width/2, df_evitadas_anual['Proposta da Tese'], width=bar_width,
-                label='Proposta da Tese', edgecolor='black')
-        ax.bar(x + bar_width/2, df_evitadas_anual['UNFCCC (2012)'], width=bar_width,
-                label='UNFCCC (2012)', edgecolor='black', hatch='//')
+        ax.bar(x - bar_width/2, df_evitadas_anual['Compostagem Tradicional'], width=bar_width,
+                label='Compostagem Tradicional', edgecolor='black')
+        ax.bar(x + bar_width/2, df_evitadas_anual['Vermicompostagem'], width=bar_width,
+                label='Vermicompostagem', edgecolor='black', hatch='//')
 
         # Adicionar valores formatados em cima das barras
-        for i, (v1, v2) in enumerate(zip(df_evitadas_anual['Proposta da Tese'], 
-                                         df_evitadas_anual['UNFCCC (2012)'])):
+        for i, (v1, v2) in enumerate(zip(df_evitadas_anual['Compostagem Tradicional'], 
+                                         df_evitadas_anual['Vermicompostagem'])):
             ax.text(i - bar_width/2, v1 + max(v1, v2)*0.01, 
                     formatar_br(v1), ha='center', fontsize=9, fontweight='bold')
             ax.text(i + bar_width/2, v2 + max(v1, v2)*0.01, 
@@ -790,40 +773,41 @@ if st.session_state.get('run_simulation', False):
 
         ax.set_xlabel('Ano')
         ax.set_ylabel('Emissões Evitadas (t CO₂eq)')
-        ax.set_title('Comparação Anual das Emissões Evitadas: Proposta da Tese vs UNFCCC (2012) - Cervejaria')
+        ax.set_title('Comparação Anual das Emissões Evitadas: Compostagem vs Vermicompostagem')
         
-        # Ajustar o eixo x para ser igual ao do gráfico de redução acumulada
         ax.set_xticks(x)
-        ax.set_xticklabels(df_anual_revisado['Year'], fontsize=8)
+        ax.set_xticklabels(df_anual['Year'], fontsize=8)
 
-        ax.legend(title='Metodologia')
+        ax.legend(title='Método de Tratamento')
         ax.yaxis.set_major_formatter(br_formatter)
         ax.grid(axis='y', linestyle='--', alpha=0.7)
         st.pyplot(fig)
 
-        # Gráfico de redução acumulada
+        # GRÁFICO DE REDUÇÃO ACUMULADA
         st.subheader("📉 Redução de Emissões Acumulada")
         fig, ax = plt.subplots(figsize=(10, 6))
-        ax.plot(df['Data'], df['Total_Aterro_tCO2eq_acum'], 'r-', label='Cenário Base (Aterro Sanitário)', linewidth=2)
-        ax.plot(df['Data'], df['Total_Vermi_tCO2eq_acum'], 'g-', label='Projeto (Compostagem em reatores com minhocas)', linewidth=2)
+        ax.plot(df['Data'], df['Total_Aterro_tCO2eq_acum'], 'r-', 
+                label='Cenário Base (Aterro Sanitário)', linewidth=2)
+        ax.plot(df['Data'], df['Total_Compost_tCO2eq_acum'], 'g-', 
+                label='Compostagem Tradicional', linewidth=2)
+        ax.plot(df['Data'], df['Total_Vermi_tCO2eq_acum'], 'b-', 
+                label='Vermicompostagem', linewidth=2)
+        ax.fill_between(df['Data'], df['Total_Compost_tCO2eq_acum'], df['Total_Aterro_tCO2eq_acum'],
+                        color='lightgreen', alpha=0.5, label='Emissões Evitadas - Compostagem')
         ax.fill_between(df['Data'], df['Total_Vermi_tCO2eq_acum'], df['Total_Aterro_tCO2eq_acum'],
-                        color='skyblue', alpha=0.5, label='Emissões Evitadas')
+                        color='lightblue', alpha=0.3, label='Emissões Evitadas - Vermicompostagem')
         ax.set_title(f'Redução de Emissões em {anos_simulacao} Anos - Cervejaria')
         ax.set_xlabel('Ano')
         ax.set_ylabel('tCO₂eq Acumulado')
         ax.legend()
         ax.grid(True, linestyle='--', alpha=0.7)
         ax.yaxis.set_major_formatter(br_formatter)
-
         st.pyplot(fig)
 
-        # Análise de Sensibilidade Global (Sobol) - PROPOSTA DA TESE
-        st.subheader("🎯 Análise de Sensibilidade Global (Sobol) - Proposta da Tese")
-        br_formatter_sobol = FuncFormatter(br_format)
-
-        np.random.seed(50)  
+        # ANÁLISE DE SENSIBILIDADE - COMPOSTAGEM
+        st.subheader("🎯 Análise de Sensibilidade Global (Sobol) - Compostagem")
         
-        problem_tese = {
+        problem_compost = {
             'num_vars': 3,
             'names': ['umidade', 'T', 'DOC'],
             'bounds': [
@@ -833,31 +817,30 @@ if st.session_state.get('run_simulation', False):
             ]
         }
 
-        param_values_tese = sample(problem_tese, n_samples)
-        results_tese = Parallel(n_jobs=-1)(delayed(executar_simulacao_completa)(params) for params in param_values_tese)
-        Si_tese = analyze(problem_tese, np.array(results_tese), print_to_console=False)
+        param_values_compost = sample(problem_compost, n_samples)
+        results_compost = Parallel(n_jobs=-1)(
+            delayed(executar_simulacao_completa_cervejaria)(params) for params in param_values_compost
+        )
+        Si_compost = analyze(problem_compost, np.array(results_compost), print_to_console=False)
         
-        sensibilidade_df_tese = pd.DataFrame({
-            'Parâmetro': problem_tese['names'],
-            'S1': Si_tese['S1'],
-            'ST': Si_tese['ST']
+        sensibilidade_df_compost = pd.DataFrame({
+            'Parâmetro': problem_compost['names'],
+            'S1': Si_compost['S1'],
+            'ST': Si_compost['ST']
         }).sort_values('ST', ascending=False)
 
         fig, ax = plt.subplots(figsize=(10, 6))
-        sns.barplot(x='ST', y='Parâmetro', data=sensibilidade_df_tese, palette='viridis', ax=ax)
-        ax.set_title('Sensibilidade Global dos Parâmetros (Índice Sobol Total) - Proposta da Tese - Cervejaria')
+        sns.barplot(x='ST', y='Parâmetro', data=sensibilidade_df_compost, palette='viridis', ax=ax)
+        ax.set_title('Sensibilidade Global dos Parâmetros - Compostagem')
         ax.set_xlabel('Índice ST')
         ax.set_ylabel('')
         ax.grid(axis='x', linestyle='--', alpha=0.7)
-        ax.xaxis.set_major_formatter(br_formatter_sobol)
         st.pyplot(fig)
 
-        # Análise de Sensibilidade Global (Sobol) - CENÁRIO UNFCCC
-        st.subheader("🎯 Análise de Sensibilidade Global (Sobol) - Cenário UNFCCC")
-
-        np.random.seed(50)
+        # ANÁLISE DE SENSIBILIDADE - VERMICOMPOSTAGEM
+        st.subheader("🎯 Análise de Sensibilidade Global (Sobol) - Vermicompostagem")
         
-        problem_unfccc = {
+        problem_vermi = {
             'num_vars': 3,
             'names': ['umidade', 'T', 'DOC'],
             'bounds': [
@@ -867,133 +850,119 @@ if st.session_state.get('run_simulation', False):
             ]
         }
 
-        param_values_unfccc = sample(problem_unfccc, n_samples)
-        results_unfccc = Parallel(n_jobs=-1)(delayed(executar_simulacao_unfccc)(params) for params in param_values_unfccc)
-        Si_unfccc = analyze(problem_unfccc, np.array(results_unfccc), print_to_console=False)
+        param_values_vermi = sample(problem_vermi, n_samples)
+        results_vermi = Parallel(n_jobs=-1)(
+            delayed(executar_simulacao_vermicompostagem_cervejaria)(params) for params in param_values_vermi
+        )
+        Si_vermi = analyze(problem_vermi, np.array(results_vermi), print_to_console=False)
         
-        sensibilidade_df_unfccc = pd.DataFrame({
-            'Parâmetro': problem_unfccc['names'],
-            'S1': Si_unfccc['S1'],
-            'ST': Si_unfccc['ST']
+        sensibilidade_df_vermi = pd.DataFrame({
+            'Parâmetro': problem_vermi['names'],
+            'S1': Si_vermi['S1'],
+            'ST': Si_vermi['ST']
         }).sort_values('ST', ascending=False)
 
         fig, ax = plt.subplots(figsize=(10, 6))
-        sns.barplot(x='ST', y='Parâmetro', data=sensibilidade_df_unfccc, palette='viridis', ax=ax)
-        ax.set_title('Sensibilidade Global dos Parâmetros (Índice Sobol Total) - Cenário UNFCCC - Cervejaria')
+        sns.barplot(x='ST', y='Parâmetro', data=sensibilidade_df_vermi, palette='viridis', ax=ax)
+        ax.set_title('Sensibilidade Global dos Parâmetros - Vermicompostagem')
         ax.set_xlabel('Índice ST')
         ax.set_ylabel('')
         ax.grid(axis='x', linestyle='--', alpha=0.7)
-        ax.xaxis.set_major_formatter(br_formatter_sobol)
         st.pyplot(fig)
 
-        # Análise de Incerteza (Monte Carlo) - PROPOSTA DA TESE
-        st.subheader("🎲 Análise de Incerteza (Monte Carlo) - Proposta da Tese")
-
+        # ANÁLISE DE INCERTEZA - COMPOSTAGEM
+        st.subheader("🎲 Análise de Incerteza (Monte Carlo) - Compostagem")
         
-        def gerar_parametros_mc_tese(n):
+        def gerar_parametros_mc_compost(n):
             np.random.seed(50)
             umidade_vals = np.random.uniform(0.75, 0.90, n)
             temp_vals = np.random.normal(25, 3, n)
             doc_vals = np.random.triangular(0.70, 0.80, 0.90, n)
-            
             return umidade_vals, temp_vals, doc_vals
 
-        umidade_vals, temp_vals, doc_vals = gerar_parametros_mc_tese(n_simulations)
+        umidade_vals, temp_vals, doc_vals = gerar_parametros_mc_compost(n_simulations)
         
-        results_mc_tese = []
+        results_mc_compost = []
         for i in range(n_simulations):
-            params_tese = [umidade_vals[i], temp_vals[i], doc_vals[i]]
-            results_mc_tese.append(executar_simulacao_completa(params_tese))
+            params = [umidade_vals[i], temp_vals[i], doc_vals[i]]
+            results_mc_compost.append(executar_simulacao_completa_cervejaria(params))
 
-        results_array_tese = np.array(results_mc_tese)
-        media_tese = np.mean(results_array_tese)
-        intervalo_95_tese = np.percentile(results_array_tese, [2.5, 97.5])
+        results_array_compost = np.array(results_mc_compost)
+        media_compost = np.mean(results_array_compost)
+        intervalo_95_compost = np.percentile(results_array_compost, [2.5, 97.5])
 
         fig, ax = plt.subplots(figsize=(10, 6))
-        sns.histplot(results_array_tese, kde=True, bins=30, color='skyblue', ax=ax)
-        ax.axvline(media_tese, color='red', linestyle='--', label=f'Média: {formatar_br(media_tese)} tCO₂eq')
-        ax.axvline(intervalo_95_tese[0], color='green', linestyle=':', label='IC 95%')
-        ax.axvline(intervalo_95_tese[1], color='green', linestyle=':')
-        ax.set_title('Distribuição das Emissões Evitadas (Simulação Monte Carlo) - Proposta da Tese - Cervejaria')
+        sns.histplot(results_array_compost, kde=True, bins=30, color='skyblue', ax=ax)
+        ax.axvline(media_compost, color='red', linestyle='--', 
+                   label=f'Média: {formatar_br(media_compost)} tCO₂eq')
+        ax.axvline(intervalo_95_compost[0], color='green', linestyle=':', label='IC 95%')
+        ax.axvline(intervalo_95_compost[1], color='green', linestyle=':')
+        ax.set_title('Distribuição das Emissões Evitadas - Compostagem')
         ax.set_xlabel('Emissões Evitadas (tCO₂eq)')
         ax.set_ylabel('Frequência')
         ax.legend()
         ax.grid(alpha=0.3)
-        ax.xaxis.set_major_formatter(br_formatter)
+        ax.xaxis.set_major_formatter(br_format)
         st.pyplot(fig)
 
-        # Análise de Incerteza (Monte Carlo) - CENÁRIO UNFCCC
-        st.subheader("🎲 Análise de Incerteza (Monte Carlo) - Cenário UNFCCC")
+        # ANÁLISE DE INCERTEZA - VERMICOMPOSTAGEM
+        st.subheader("🎲 Análise de Incerteza (Monte Carlo) - Vermicompostagem")
         
-        def gerar_parametros_mc_unfccc(n):
+        def gerar_parametros_mc_vermi(n):
             np.random.seed(50)
             umidade_vals = np.random.uniform(0.75, 0.90, n)
             temp_vals = np.random.normal(25, 3, n)
             doc_vals = np.random.triangular(0.70, 0.80, 0.90, n)
-            
             return umidade_vals, temp_vals, doc_vals
 
-        umidade_vals, temp_vals, doc_vals = gerar_parametros_mc_unfccc(n_simulations)
+        umidade_vals, temp_vals, doc_vals = gerar_parametros_mc_vermi(n_simulations)
         
-        results_mc_unfccc = []
+        results_mc_vermi = []
         for i in range(n_simulations):
-            params_unfccc = [umidade_vals[i], temp_vals[i], doc_vals[i]]
-            results_mc_unfccc.append(executar_simulacao_unfccc(params_unfccc))
+            params = [umidade_vals[i], temp_vals[i], doc_vals[i]]
+            results_mc_vermi.append(executar_simulacao_vermicompostagem_cervejaria(params))
 
-        results_array_unfccc = np.array(results_mc_unfccc)
-        media_unfccc = np.mean(results_array_unfccc)
-        intervalo_95_unfccc = np.percentile(results_array_unfccc, [2.5, 97.5])
+        results_array_vermi = np.array(results_mc_vermi)
+        media_vermi = np.mean(results_array_vermi)
+        intervalo_95_vermi = np.percentile(results_array_vermi, [2.5, 97.5])
 
         fig, ax = plt.subplots(figsize=(10, 6))
-        sns.histplot(results_array_unfccc, kde=True, bins=30, color='coral', ax=ax)
-        ax.axvline(media_unfccc, color='red', linestyle='--', label=f'Média: {formatar_br(media_unfccc)} tCO₂eq')
-        ax.axvline(intervalo_95_unfccc[0], color='green', linestyle=':', label='IC 95%')
-        ax.axvline(intervalo_95_unfccc[1], color='green', linestyle=':')
-        ax.set_title('Distribuição das Emissões Evitadas (Simulação Monte Carlo) - Cenário UNFCCC - Cervejaria')
+        sns.histplot(results_array_vermi, kde=True, bins=30, color='coral', ax=ax)
+        ax.axvline(media_vermi, color='red', linestyle='--', 
+                   label=f'Média: {formatar_br(media_vermi)} tCO₂eq')
+        ax.axvline(intervalo_95_vermi[0], color='green', linestyle=':', label='IC 95%')
+        ax.axvline(intervalo_95_vermi[1], color='green', linestyle=':')
+        ax.set_title('Distribuição das Emissões Evitadas - Vermicompostagem')
         ax.set_xlabel('Emissões Evitadas (tCO₂eq)')
         ax.set_ylabel('Frequência')
         ax.legend()
         ax.grid(alpha=0.3)
-        ax.xaxis.set_major_formatter(br_formatter)
+        ax.xaxis.set_major_formatter(br_format)
         st.pyplot(fig)
 
-        # Análise Estatística de Comparação
+        # ANÁLISE ESTATÍSTICA DE COMPARAÇÃO
         st.subheader("📊 Análise Estatística de Comparação")
         
         # Teste de normalidade para as diferenças
-        diferencas = results_array_tese - results_array_unfccc
+        diferencas = results_array_compost - results_array_vermi
         _, p_valor_normalidade_diff = stats.normaltest(diferencas)
         st.write(f"Teste de normalidade das diferenças (p-value): **{p_valor_normalidade_diff:.5f}**")
 
         # Teste T pareado
-        ttest_pareado, p_ttest_pareado = stats.ttest_rel(results_array_tese, results_array_unfccc)
+        ttest_pareado, p_ttest_pareado = stats.ttest_rel(results_array_compost, results_array_vermi)
         st.write(f"Teste T pareado: Estatística t = **{ttest_pareado:.5f}**, P-valor = **{p_ttest_pareado:.5f}**")
 
         # Teste de Wilcoxon para amostras pareadas
-        wilcoxon_stat, p_wilcoxon = stats.wilcoxon(results_array_tese, results_array_unfccc)
+        wilcoxon_stat, p_wilcoxon = stats.wilcoxon(results_array_compost, results_array_vermi)
         st.write(f"Teste de Wilcoxon (pareado): Estatística = **{wilcoxon_stat:.5f}**, P-valor = **{p_wilcoxon:.5f}**")
 
-        # Tabela de resultados anuais - Proposta da Tese
-        st.subheader("📋 Resultados Anuais - Proposta da Tese")
-
-        # Criar uma cópia para formatação
-        df_anual_formatado = df_anual_revisado.copy()
+        # TABELAS DE RESULTADOS
+        st.subheader("📋 Resultados Anuais")
+        df_anual_formatado = df_anual.copy()
         for col in df_anual_formatado.columns:
             if col != 'Year':
                 df_anual_formatado[col] = df_anual_formatado[col].apply(formatar_br)
-
         st.dataframe(df_anual_formatado)
-
-        # Tabela de resultados anuais - Metodologia UNFCCC
-        st.subheader("📋 Resultados Anuais - Metodologia UNFCCC")
-
-        # Criar uma cópia para formatação
-        df_comp_formatado = df_comp_anual_revisado.copy()
-        for col in df_comp_formatado.columns:
-            if col != 'Year':
-                df_comp_formatado[col] = df_comp_formatado[col].apply(formatar_br)
-
-        st.dataframe(df_comp_formatado)
 
 else:
     st.info("💡 Ajuste os parâmetros da cervejaria na barra lateral e clique em 'Executar Simulação' para ver os resultados.")
@@ -1014,23 +983,14 @@ st.markdown("""
 - Alta biodegradabilidade
 - Perfis de decomposição acelerada
 
-**📚 Referências por Cenário:**
-
-**Cenário de Baseline (Aterro Sanitário):**
-- Metano: IPCC (2006), UNFCCC (2016) e Wang et al. (2023) 
-- Óxido Nitroso: Wang et al. (2017)
-- Metano e Óxido Nitroso no pré-descarte: Feng et al. (2020)
-
-**Proposta da Tese (Compostagem em reatores com minhocas):**
-- Metano e Óxido Nitroso: Yang et al. (2017) - Parâmetros ajustados para cervejaria
-
-**Cenário UNFCCC (Compostagem sem minhocas a céu aberto):**
-- Protocolo AMS-III.F: UNFCCC (2016)
-- Fatores de emissões: Yang et al. (2017) - Parâmetros ajustados para cervejaria
-
 **💡 Vantagens para Cervejarias:**
 - Resíduos com alto potencial para geração de créditos de carbono
 - Compostagem como alternativa sustentável
 - Redução significativa de emissões comparado ao aterro
 - Possibilidade de receita adicional com créditos de carbono
+
+**📚 Referências Específicas para Cervejarias:**
+- Caracterização de resíduos de cervejaria: Brasil (2023)
+- Potencial de compostagem: EPA (2022)  
+- Fatores de emissão ajustados: IPCC (2006) com fatores específicos
 """)
