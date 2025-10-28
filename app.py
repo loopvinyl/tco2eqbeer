@@ -1,3 +1,5 @@
+[file name]: py_tco2eqbeer_v3.txt
+[file content begin]
 import requests
 from bs4 import BeautifulSoup
 import streamlit as st
@@ -783,25 +785,47 @@ if st.session_state.get('run_simulation', False):
         ax.grid(axis='y', linestyle='--', alpha=0.7)
         st.pyplot(fig)
 
-        # GRÁFICO DE REDUÇÃO ACUMULADA
+        # GRÁFICO DE REDUÇÃO ACUMULADA - AJUSTADO CONFORME SOLICITADO
         st.subheader("📉 Redução de Emissões Acumulada")
         fig, ax = plt.subplots(figsize=(10, 6))
+        
+        # Plotar apenas o cenário base e as áreas de redução
         ax.plot(df['Data'], df['Total_Aterro_tCO2eq_acum'], 'r-', 
-                label='Cenário Base (Aterro Sanitário)', linewidth=2)
-        ax.plot(df['Data'], df['Total_Compost_tCO2eq_acum'], 'g-', 
-                label='Compostagem Tradicional', linewidth=2)
-        ax.plot(df['Data'], df['Total_Vermi_tCO2eq_acum'], 'b-', 
-                label='Compostagem em Reatores Com Minhocas', linewidth=2)
+                label='Cenário Base (Aterro Sanitário)', linewidth=3)
+        
+        # Área da compostagem tradicional (menor)
         ax.fill_between(df['Data'], df['Total_Compost_tCO2eq_acum'], df['Total_Aterro_tCO2eq_acum'],
-                        color='lightgreen', alpha=0.5, label='Emissões Evitadas - Compostagem')
+                        color='lightgreen', alpha=0.4, label='Redução - Compostagem Tradicional')
+        
+        # Área da vermicompostagem (maior - mais destacada)
         ax.fill_between(df['Data'], df['Total_Vermi_tCO2eq_acum'], df['Total_Aterro_tCO2eq_acum'],
-                        color='lightblue', alpha=0.3, label='Emissões Evitadas - Compostagem em Reatores Com Minhocas')
-        ax.set_title(f'Redução de Emissões em {anos_simulacao} Anos - Cervejaria')
+                        color='lightblue', alpha=0.7, hatch='///', 
+                        label='Redução - Compostagem com Minhocas (Maior Redução)')
+        
+        ax.set_title(f'Redução de Emissões Acumulada em {anos_simulacao} Anos - Cervejaria')
         ax.set_xlabel('Ano')
         ax.set_ylabel('tCO₂eq Acumulado')
-        ax.legend()
+        ax.legend(loc='upper left')
         ax.grid(True, linestyle='--', alpha=0.7)
         ax.yaxis.set_major_formatter(br_formatter)
+        
+        # Adicionar anotações para destacar a diferença
+        ultimo_ano = df['Data'].iloc[-1]
+        reducao_compost = df['Reducao_Compost_tCO2eq_acum'].iloc[-1]
+        reducao_vermi = df['Reducao_Vermi_tCO2eq_acum'].iloc[-1]
+        
+        ax.annotate(f'Compostagem Tradicional\n{formatar_br(reducao_compost)} tCO₂eq', 
+                   xy=(ultimo_ano, df['Total_Compost_tCO2eq_acum'].iloc[-1]), 
+                   xytext=(10, 30), textcoords='offset points',
+                   bbox=dict(boxstyle='round,pad=0.3', facecolor='lightgreen', alpha=0.7),
+                   arrowprops=dict(arrowstyle='->', connectionstyle='arc3,rad=0'))
+        
+        ax.annotate(f'Compostagem com Minhocas\n{formatar_br(reducao_vermi)} tCO₂eq', 
+                   xy=(ultimo_ano, df['Total_Vermi_tCO2eq_acum'].iloc[-1]), 
+                   xytext=(10, -40), textcoords='offset points',
+                   bbox=dict(boxstyle='round,pad=0.3', facecolor='lightblue', alpha=0.7),
+                   arrowprops=dict(arrowstyle='->', connectionstyle='arc3,rad=0'))
+        
         st.pyplot(fig)
 
         # ANÁLISE DE SENSIBILIDADE - COMPOSTAGEM
@@ -991,3 +1015,4 @@ st.markdown("""
 
 
 """)
+[file content end]
