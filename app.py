@@ -989,8 +989,5 @@ st.markdown("""
 - Redução significativa de emissões comparado ao aterro
 - Possibilidade de receita adicional com créditos de carbono
 
-**📚 Referências Específicas para Cervejarias:**
-- Caracterização de resíduos de cervejaria: Brasil (2023)
-- Potencial de compostagem: EPA (2022)  
-- Fatores de emissão ajustados: IPCC (2006) com fatores específicos
+
 """)
