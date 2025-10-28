@@ -1,5 +1,3 @@
-[file name]: py_tco2eqbeer_v3.txt
-[file content begin]
 import requests
 from bs4 import BeautifulSoup
 import streamlit as st
