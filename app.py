@@ -281,11 +281,18 @@ with st.sidebar:
     dias_operacao_mes = st.slider("Dias de operação por mês", 20, 30, 25, 1,
                                 help="Número de dias em que a cervejaria opera por mês")
     
-    # Calcular resíduos automaticamente (baseado nos nossos cálculos anteriores)
-    residuos_kg_dia = (producao_mensal_litros * 0.17) / dias_operacao_mes
+    # NOVO: Fator de conversão para resíduos
+    st.subheader("📊 Cálculo de Resíduos")
+    fator_residuos = st.slider("Fator de resíduos (kg/litro)", 
+                              min_value=0.10, max_value=0.30, value=0.17, step=0.01,
+                              help="Quantidade de resíduos gerados por litro de cerveja produzida")
+    
+    # Calcular resíduos automaticamente
+    residuos_kg_dia = (producao_mensal_litros * fator_residuos) / dias_operacao_mes
     residuos_kg_dia = int(residuos_kg_dia)
     
     st.info(f"**Resíduos estimados:** {residuos_kg_dia} kg/dia")
+    st.caption(f"*Cálculo: ({producao_mensal_litros} L × {fator_residuos} kg/L) ÷ {dias_operacao_mes} dias = {residuos_kg_dia} kg/dia*")
     
     st.subheader("📊 Composição dos Resíduos")
     
@@ -345,7 +352,9 @@ with st.sidebar:
         **📊 Produção e Resíduos:**
         - **Produção mensal:** {producao_mensal_litros} litros
         - **Dias de operação:** {dias_operacao_mes} dias/mês
+        - **Fator de resíduos:** {fator_residuos} kg/litro
         - **Resíduos estimados:** {residuos_kg_dia} kg/dia
+        - **Cálculo:** ({producao_mensal_litros} L × {fator_residuos} kg/L) ÷ {dias_operacao_mes} dias = {residuos_kg_dia} kg/dia
         - **Composição:** {percentual_bagaco}% bagaço + {percentual_levedura}% levedura
         
         **💧 Umidade:**
@@ -371,6 +380,15 @@ with st.sidebar:
         - Rico em matéria orgânica
         - Alto potencial de geração de metano
         - Ideal para compostagem e geração de créditos
+        
+        **📝 Sobre o Fator de Resíduos ({fator_residuos} kg/L):**
+        Este fator representa a quantidade média de resíduos gerados por litro de cerveja produzida:
+        - **Bagaço de malte:** ~0.12-0.15 kg/L
+        - **Levedura gasta:** ~0.02-0.05 kg/L  
+        - **Total típico:** 0.14-0.20 kg/L
+        - **Valor padrão:** 0.17 kg/L (baseado em médias de cervejarias artesanais)
+        
+        **💡 Dica:** Ajuste este fator conforme a eficiência do seu processo produtivo!
         """)
     
     st.subheader("🎯 Configuração de Simulação")
