@@ -14,10 +14,10 @@ from matplotlib.ticker import FuncFormatter
 from SALib.sample.sobol import sample
 from SALib.analyze.sobol import analyze
 
-np.random.seed(50)  # Garante reprodutibilidade
+np.random.seed(50)
 
 # Configurações iniciais
-st.set_page_config(page_title="Simulador de Emissões CO₂eq", layout="wide")
+st.set_page_config(page_title="Simulador de Emissões CO₂eq - Cervejarias", layout="wide")
 warnings.filterwarnings("ignore", category=FutureWarning)
 pd.set_option('display.max_columns', None)
 pd.set_option('display.width', None)
@@ -27,13 +27,10 @@ plt.rcParams['font.size'] = 10
 sns.set_style("whitegrid")
 
 # =============================================================================
-# FUNÇÕES DE COTAÇÃO AUTOMÁTICA DO CARBONO E CÂMBIO (AGORA DEFINIDAS PRIMEIRO)
+# FUNÇÕES DE COTAÇÃO DO CARBONO (mantidas iguais)
 # =============================================================================
 
 def obter_cotacao_carbono_investing():
-    """
-    Obtém a cotação em tempo real do carbono via web scraping do Investing.com
-    """
     try:
         url = "https://www.investing.com/commodities/carbon-emissions"
         headers = {
@@ -48,7 +45,6 @@ def obter_cotacao_carbono_investing():
         
         soup = BeautifulSoup(response.content, 'html.parser')
         
-        # Várias estratégias para encontrar o preço
         selectores = [
             '[data-test="instrument-price-last"]',
             '.text-2xl',
@@ -68,7 +64,6 @@ def obter_cotacao_carbono_investing():
                 elemento = soup.select_one(seletor)
                 if elemento:
                     texto_preco = elemento.text.strip().replace(',', '')
-                    # Remover caracteres não numéricos exceto ponto
                     texto_preco = ''.join(c for c in texto_preco if c.isdigit() or c == '.')
                     if texto_preco:
                         preco = float(texto_preco)
@@ -79,7 +74,6 @@ def obter_cotacao_carbono_investing():
         if preco is not None:
             return preco, "€", "Carbon Emissions Future", True, fonte
         
-        # Tentativa alternativa: procurar por padrões numéricos no HTML
         import re
         padroes_preco = [
             r'"last":"([\d,]+)"',
@@ -95,7 +89,7 @@ def obter_cotacao_carbono_investing():
                 try:
                     preco_texto = match.replace(',', '')
                     preco = float(preco_texto)
-                    if 50 < preco < 200:  # Faixa razoável para carbono
+                    if 50 < preco < 200:
                         return preco, "€", "Carbon Emissions Future", True, fonte
                 except ValueError:
                     continue
@@ -106,24 +100,15 @@ def obter_cotacao_carbono_investing():
         return None, None, None, False, f"Investing.com - Erro: {str(e)}"
 
 def obter_cotacao_carbono():
-    """
-    Obtém a cotação em tempo real do carbono - usa apenas Investing.com
-    """
-    # Tentar via Investing.com
     preco, moeda, contrato_info, sucesso, fonte = obter_cotacao_carbono_investing()
     
     if sucesso:
         return preco, moeda, f"{contrato_info}", True, fonte
     
-    # Fallback para valor padrão
     return 85.50, "€", "Carbon Emissions (Referência)", False, "Referência"
 
 def obter_cotacao_euro_real():
-    """
-    Obtém a cotação em tempo real do Euro em relação ao Real Brasileiro
-    """
     try:
-        # API do BCB
         url = "https://economia.awesomeapi.com.br/last/EUR-BRL"
         response = requests.get(url, timeout=10)
         if response.status_code == 200:
@@ -134,7 +119,6 @@ def obter_cotacao_euro_real():
         pass
     
     try:
-        # Fallback para API alternativa
         url = "https://api.exchangerate-api.com/v4/latest/EUR"
         response = requests.get(url, timeout=10)
         if response.status_code == 200:
@@ -144,72 +128,54 @@ def obter_cotacao_euro_real():
     except:
         pass
     
-    # Fallback para valor de referência
     return 5.50, "R$", False, "Referência"
 
 def calcular_valor_creditos(emissoes_evitadas_tco2eq, preco_carbono_por_tonelada, moeda, taxa_cambio=1):
-    """
-    Calcula o valor financeiro das emissões evitadas baseado no preço do carbono
-    """
     valor_total = emissoes_evitadas_tco2eq * preco_carbono_por_tonelada * taxa_cambio
     return valor_total
 
 def exibir_cotacao_carbono():
-    """
-    Exibe a cotação do carbono com informações - ATUALIZADA AUTOMATICAMENTE
-    """
     st.sidebar.header("💰 Mercado de Carbono e Câmbio")
     
-    # Atualização automática na primeira execução
     if not st.session_state.get('cotacao_carregada', False):
         st.session_state.mostrar_atualizacao = True
         st.session_state.cotacao_carregada = True
     
-    # Botão para atualizar cotações
     col1, col2 = st.sidebar.columns([3, 1])
     with col1:
         if st.button("🔄 Atualizar Cotações", key="atualizar_cotacoes"):
             st.session_state.cotacao_atualizada = True
             st.session_state.mostrar_atualizacao = True
     
-    # Mostrar mensagem de atualização se necessário
     if st.session_state.get('mostrar_atualizacao', False):
         st.sidebar.info("🔄 Atualizando cotações...")
         
-        # Obter cotação do carbono
         preco_carbono, moeda, contrato_info, sucesso_carbono, fonte_carbono = obter_cotacao_carbono()
-        
-        # Obter cotação do Euro
         preco_euro, moeda_real, sucesso_euro, fonte_euro = obter_cotacao_euro_real()
         
-        # Atualizar session state
         st.session_state.preco_carbono = preco_carbono
         st.session_state.moeda_carbono = moeda
         st.session_state.taxa_cambio = preco_euro
         st.session_state.moeda_real = moeda_real
         st.session_state.fonte_cotacao = fonte_carbono
         
-        # Resetar flags
         st.session_state.mostrar_atualizacao = False
         st.session_state.cotacao_atualizada = False
         
         st.rerun()
 
-    # Exibe cotação atual do carbono
     st.sidebar.metric(
         label=f"Preço do Carbono (tCO₂eq)",
         value=f"{st.session_state.moeda_carbono} {st.session_state.preco_carbono:.2f}",
         help=f"Fonte: {st.session_state.fonte_cotacao}"
     )
     
-    # Exibe cotação atual do Euro
     st.sidebar.metric(
         label="Euro (EUR/BRL)",
         value=f"{st.session_state.moeda_real} {st.session_state.taxa_cambio:.2f}",
         help="Cotação do Euro em Reais Brasileiros"
     )
     
-    # Calcular preço do carbono em Reais
     preco_carbono_reais = st.session_state.preco_carbono * st.session_state.taxa_cambio
     
     st.sidebar.metric(
@@ -218,7 +184,6 @@ def exibir_cotacao_carbono():
         help="Preço do carbono convertido para Reais Brasileiros"
     )
     
-    # Informações adicionais
     with st.sidebar.expander("ℹ️ Informações do Mercado de Carbono"):
         st.markdown(f"""
         **📊 Cotações Atuais:**
@@ -245,20 +210,17 @@ def exibir_cotacao_carbono():
         """)
 
 # =============================================================================
-# INICIALIZAÇÃO DA SESSION STATE (AGORA DEPOIS DAS FUNÇÕES DE COTAÇÃO)
+# INICIALIZAÇÃO DA SESSION STATE
 # =============================================================================
 
-# Inicializar todas as variáveis de session state necessárias
 def inicializar_session_state():
     if 'preco_carbono' not in st.session_state:
-        # Buscar cotação automaticamente na inicialização
         preco_carbono, moeda, contrato_info, sucesso, fonte = obter_cotacao_carbono()
         st.session_state.preco_carbono = preco_carbono
         st.session_state.moeda_carbono = moeda
         st.session_state.fonte_cotacao = fonte
         
     if 'taxa_cambio' not in st.session_state:
-        # Buscar cotação do Euro automaticamente
         preco_euro, moeda_real, sucesso_euro, fonte_euro = obter_cotacao_euro_real()
         st.session_state.taxa_cambio = preco_euro
         st.session_state.moeda_real = moeda_real
@@ -274,136 +236,104 @@ def inicializar_session_state():
     if 'cotacao_carregada' not in st.session_state:
         st.session_state.cotacao_carregada = False
 
-# Chamar a inicialização
 inicializar_session_state()
 
 # =============================================================================
-# FUNÇÕES ORIGINAIS DO SEU SCRIPT
+# FUNÇÕES DE FORMATAÇÃO
 # =============================================================================
 
-# Função para formatar números no padrão brasileiro
 def formatar_br(numero):
-    """
-    Formata números no padrão brasileiro: 1.234,56
-    """
     if pd.isna(numero):
         return "N/A"
-    
-    # Arredonda para 2 casas decimais
     numero = round(numero, 2)
-    
-    # Formata como string e substitui o ponto pela vírgula
     return f"{numero:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
-# Função de formatação para os gráficos
 def br_format(x, pos):
-    """
-    Função de formatação para eixos de gráficos (padrão brasileiro)
-    """
     if x == 0:
         return "0"
-    
-    # Para valores muito pequenos, usa notação científica
     if abs(x) < 0.01:
         return f"{x:.1e}".replace(".", ",")
-    
-    # Para valores grandes, formata com separador de milhar
     if abs(x) >= 1000:
         return f"{x:,.0f}".replace(",", "X").replace(".", ",").replace("X", ".")
-    
-    # Para valores menores, mostra duas casas decimais
     return f"{x:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
 def br_format_5_dec(x, pos):
-    """
-    Função de formatação para eixos de gráficos (padrão brasileiro com 5 decimais)
-    """
     return f"{x:,.5f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
-# Título do aplicativo
-st.title("Simulador de Emissões de tCO₂eq")
+# =============================================================================
+# INTERFACE PRINCIPAL
+# =============================================================================
+
+st.title("🍻 Simulador de Emissões de tCO₂eq para Cervejarias")
 st.markdown("""
-Esta ferramenta projeta os Créditos de Carbono ao calcular as emissões de gases de efeito estufa para dois contextos de gestão de resíduos
+Esta ferramenta projeta os Créditos de Carbono para cervejarias ao calcular as emissões de gases de efeito estufa 
+para diferentes contextos de gestão de resíduos (bagaço de malte e levedura)
 """)
 
 # =============================================================================
-# SIDEBAR COM PARÂMETROS ATUALIZADOS
+# SIDEBAR COM PARÂMETROS ESPECÍFICOS PARA CERVEJARIAS
 # =============================================================================
 
-# Seção de cotação do carbono - AGORA ATUALIZADA AUTOMATICAMENTE
 exibir_cotacao_carbono()
 
-# Seção atualizada de parâmetros
 with st.sidebar:
-    st.header("⚙️ Parâmetros de Entrada")
+    st.header("⚙️ Parâmetros da Cervejaria")
     
-    # Entrada principal de resíduos
-    residuos_kg_dia = st.slider("Quantidade de resíduos (kg/dia)", 
-                               min_value=10, max_value=1000, value=100, step=10,
-                               help="Quantidade diária de resíduos orgânicos gerados")
+    # Produção de cerveja e cálculo automático de resíduos
+    producao_mensal_litros = st.slider("Produção mensal de cerveja (litros)", 
+                                     min_value=500, max_value=10000, value=1500, step=500,
+                                     help="Volume mensal de cerveja produzida")
     
+    # Cálculo automático de resíduos baseado na produção
+    dias_operacao_mes = st.slider("Dias de operação por mês", 20, 30, 25, 1,
+                                help="Número de dias em que a cervejaria opera por mês")
+    
+    # Calcular resíduos automaticamente (baseado nos nossos cálculos anteriores)
+    residuos_kg_dia = (producao_mensal_litros * 0.17) / dias_operacao_mes
+    residuos_kg_dia = int(residuos_kg_dia)
+    
+    st.info(f"**Resíduos estimados:** {residuos_kg_dia} kg/dia")
+    
+    st.subheader("📊 Composição dos Resíduos")
+    
+    # Composição dos resíduos da cervejaria
+    percentual_bagaco = st.slider("Percentual de bagaço de malte", 70, 90, 80, 1,
+                                 help="Percentual de bagaço de malte na composição dos resíduos")
+    percentual_levedura = 100 - percentual_bagaco
+    
+    st.write(f"**Composição:** {percentual_bagaco}% bagaço + {percentual_levedura}% levedura")
+    
+    # Umidade média ponderada baseada na composição
+    umidade_bagaco = st.slider("Umidade do bagaço (%)", 75, 85, 80, 1,
+                              help="Teor de umidade do bagaço de malte")
+    umidade_levedura = st.slider("Umidade da levedura (%)", 85, 95, 90, 1,
+                                help="Teor de umidade da levedura gasta")
+    
+    # Calcular umidade média ponderada
+    umidade_media = (umidade_bagaco * percentual_bagaco + umidade_levedura * percentual_levedura) / 100
+    umidade = umidade_media / 100.0
+    
+    st.write(f"**Umidade média:** {umidade_media:.1f}%")
+    
+    # DOC específico para resíduos de cervejaria
+    doc_bagaco = st.slider("DOC do bagaço", 0.70, 0.90, 0.80, 0.01,
+                          help="Carbono Orgânico Degradável do bagaço de malte")
+    doc_levedura = st.slider("DOC da levedura", 0.80, 0.95, 0.90, 0.01,
+                            help="Carbono Orgânico Degradável da levedura")
+    
+    # DOC médio ponderado
+    doc_medio = (doc_bagaco * percentual_bagaco + doc_levedura * percentual_levedura) / 100
+    DOC = doc_medio
+    
+    st.write(f"**DOC médio:** {doc_medio:.3f}")
+    
+    # Parâmetros operacionais (mantidos do original)
     st.subheader("📊 Parâmetros Operacionais")
-    
-    # Umidade com formatação brasileira (0,85 em vez de 0.85)
-    umidade_valor = st.slider("Umidade do resíduo (%)", 50, 95, 85, 1,
-                             help="Percentual de umidade dos resíduos orgânicos")
-    umidade = umidade_valor / 100.0
-    st.write(f"**Umidade selecionada:** {formatar_br(umidade_valor)}%")
-    
-    # Temperatura - NOVO PARÂMETRO
-    temperatura = st.slider("Temperatura média (°C)", 15, 35, 25, 1,
-                           help="Temperatura ambiente que influencia a decomposição e cálculo do DOCf")
-    
-    # DOC - NOVO PARÂMETRO
-    doc_valor = st.slider("DOC (Carbono Orgânico Degradável - fração)", 0.10, 0.50, 0.15, 0.01,
-                         help="Fração de carbono orgânico disponível para decomposição nos resíduos")
-    
-    # Cálculo automático do DOCf baseado na temperatura
-    docf_calculado = 0.0147 * temperatura + 0.28
-    st.write(f"**DOCf calculado:** {formatar_br(docf_calculado)}")
-    st.write(f"*(DOCf = 0,0147 × {temperatura} + 0,28)*")
     
     massa_exposta_kg = st.slider("Massa exposta na frente de trabalho (kg)", 50, 200, 100, 10,
                                 help="Massa de resíduos exposta diariamente para tratamento")
     h_exposta = st.slider("Horas expostas por dia", 4, 24, 8, 1,
                          help="Horas diárias de exposição dos resíduos")
-    
-    # Expander explicativo sobre os parâmetros
-    with st.expander("ℹ️ Explicação dos Parâmetros Operacionais"):
-        st.markdown(f"""
-        **📊 Entenda os Parâmetros:**
-        
-        **💧 Umidade ({umidade_valor}%):**
-        - Percentual de água presente nos resíduos
-        - Afeta diretamente a taxa de decomposição
-        - Valores mais altos podem acelerar a degradação
-        
-        **🌡️ Temperatura ({temperatura}°C):**
-        - Temperatura ambiente média
-        - Controla a atividade microbiana
-        - **Diretamente usada no cálculo do DOCf**
-        
-        **🌿 DOC ({formatar_br(doc_valor)}):**
-        - **Carbono Orgânico Degradável**
-        - Fração do carbono total que está disponível para decomposição
-        - Representa o "alimento" para microrganismos
-        
-        **📈 DOCf ({formatar_br(docf_calculado)}):**
-        - **Fração do DOC que realmente decompõe**
-        - **Calculado automaticamente:** DOCf = 0,0147 × Temperatura + 0,28
-        - Temperatura mais alta → DOCf mais alto → Mais decomposição
-        - Define quanto do carbono disponível é efetivamente convertido em gases
-        
-        **🔗 Relação entre os parâmetros:**
-        - **Umidade + Temperatura** → Controlam as **condições** de decomposição
-        - **DOC** → Define o **potencial máximo** de emissões
-        - **DOCf** → Define quanto desse potencial é **realizado**
-        
-        **🎯 Impacto nas Emissões:**
-        - **DOC alto + Temperatura alta** = Máximas emissões de CH₄
-        - **Umidade balanceada** = Otimização do processo
-        - **Temperatura baixa** = Redução das emissões
-        """)
     
     st.subheader("🎯 Configuração de Simulação")
     anos_simulacao = st.slider("Anos de simulação", 5, 50, 20, 5,
@@ -417,72 +347,62 @@ with st.sidebar:
         st.session_state.run_simulation = True
 
 # =============================================================================
-# PARÂMETROS FIXOS (ATUALIZADOS PARA USAR OS VALORES DO SIDEBAR)
+# PARÂMETROS FIXOS AJUSTADOS PARA CERVEJARIAS
 # =============================================================================
 
-# AGORA USANDOS OS VALORES DO SIDEBAR:
-# - temperatura (do slider)
-# - doc_valor (do slider)  
-# - umidade (calculada do slider de umidade)
+T = 25  # Temperatura média (ºC)
+DOCf_val = 0.0147 * T + 0.28
+MCF = 1
+F = 0.5
+OX = 0.1
+Ri = 0.0
+k_ano = 0.06
 
-# Cálculo do DOCf baseado na temperatura do sidebar
-DOCf_val = 0.0147 * temperatura + 0.28
+# Parâmetros específicos para resíduos de cervejaria
+TOC_CERVEJARIA = 0.45  # Maior que resíduos genéricos devido à alta matéria orgânica
+TN_CERVEJARIA = 25.0 / 1000  # Teor de nitrogênio mais alto
 
-# Outros parâmetros fixos
-MCF = 1  # Fator de correção de metano
-F = 0.5  # Fração de metano no biogás
-OX = 0.1  # Fator de oxidação
-Ri = 0.0  # Metano recuperado
+# Fatores de emissão para vermicompostagem (Yang et al. 2017) - ajustados para cervejaria
+CH4_C_FRAC_YANG_CERVEJARIA = 0.15 / 100  # Ajustado para resíduos de cervejaria
+N2O_N_FRAC_YANG_CERVEJARIA = 1.00 / 100  # Ajustado para resíduos de cervejaria
+DIAS_COMPOSTAGEM = 50
 
-# Constante de decaimento (fixa como no script anexo)
-k_ano = 0.06  # Constante de decaimento anual
-
-# Vermicompostagem (Yang et al. 2017) - valores fixos
-TOC_YANG = 0.436  # Fração de carbono orgânico total
-TN_YANG = 14.2 / 1000  # Fração de nitrogênio total
-CH4_C_FRAC_YANG = 0.13 / 100  # Fração do TOC emitida como CH4-C (fixo)
-N2O_N_FRAC_YANG = 0.92 / 100  # Fração do TN emitida como N2O-N (fixo)
-DIAS_COMPOSTAGEM = 50  # Período total de compostagem
-
-# Perfil temporal de emissões baseado em Yang et al. (2017)
-PERFIL_CH4_VERMI = np.array([
-    0.02, 0.02, 0.02, 0.03, 0.03,  # Dias 1-5
-    0.04, 0.04, 0.05, 0.05, 0.06,  # Dias 6-10
-    0.07, 0.08, 0.09, 0.10, 0.09,  # Dias 11-15
-    0.08, 0.07, 0.06, 0.05, 0.04,  # Dias 16-20
-    0.03, 0.02, 0.02, 0.01, 0.01,  # Dias 21-25
-    0.01, 0.01, 0.01, 0.01, 0.01,  # Dias 26-30
-    0.005, 0.005, 0.005, 0.005, 0.005,  # Dias 31-35
-    0.005, 0.005, 0.005, 0.005, 0.005,  # Dias 36-40
-    0.002, 0.002, 0.002, 0.002, 0.002,  # Dias 41-45
-    0.001, 0.001, 0.001, 0.001, 0.001   # Dias 46-50
-])
-PERFIL_CH4_VERMI /= PERFIL_CH4_VERMI.sum()
-
-PERFIL_N2O_VERMI = np.array([
-    0.15, 0.10, 0.20, 0.05, 0.03,  # Dias 1-5 (pico no dia 3)
-    0.03, 0.03, 0.04, 0.05, 0.06,  # Dias 6-10
-    0.08, 0.09, 0.10, 0.08, 0.07,  # Dias 11-15
-    0.06, 0.05, 0.04, 0.03, 0.02,  # Dias 16-20
-    0.01, 0.01, 0.005, 0.005, 0.005,  # Dias 21-25
+# Perfis de emissão ajustados para resíduos de cervejaria (decomposição mais rápida)
+PERFIL_CH4_VERMI_CERVEJARIA = np.array([
+    0.03, 0.04, 0.05, 0.07, 0.09,  # Dias 1-5 (início mais rápido)
+    0.12, 0.15, 0.18, 0.20, 0.18,  # Dias 6-10 (pico antecipado)
+    0.15, 0.12, 0.10, 0.08, 0.06,  # Dias 11-15
+    0.05, 0.04, 0.03, 0.02, 0.02,  # Dias 16-20
+    0.01, 0.01, 0.01, 0.005, 0.005,  # Dias 21-25
     0.005, 0.005, 0.005, 0.005, 0.005,  # Dias 26-30
     0.002, 0.002, 0.002, 0.002, 0.002,  # Dias 31-35
     0.001, 0.001, 0.001, 0.001, 0.001,  # Dias 36-40
     0.001, 0.001, 0.001, 0.001, 0.001,  # Dias 41-45
     0.001, 0.001, 0.001, 0.001, 0.001   # Dias 46-50
 ])
-PERFIL_N2O_VERMI /= PERFIL_N2O_VERMI.sum()
+PERFIL_CH4_VERMI_CERVEJARIA /= PERFIL_CH4_VERMI_CERVEJARIA.sum()
 
-# Emissões pré-descarte (Feng et al. 2020)
-CH4_pre_descarte_ugC_por_kg_h_min = 0.18
-CH4_pre_descarte_ugC_por_kg_h_max = 5.38
-CH4_pre_descarte_ugC_por_kg_h_media = 2.78
+PERFIL_N2O_VERMI_CERVEJARIA = np.array([
+    0.12, 0.15, 0.20, 0.08, 0.05,  # Dias 1-5 (pico mais pronunciado)
+    0.06, 0.08, 0.10, 0.12, 0.15,  # Dias 6-10
+    0.18, 0.20, 0.18, 0.15, 0.12,  # Dias 11-15 (pico principal)
+    0.10, 0.08, 0.06, 0.05, 0.04,  # Dias 16-20
+    0.03, 0.02, 0.01, 0.01, 0.01,  # Dias 21-25
+    0.005, 0.005, 0.005, 0.005, 0.005,  # Dias 26-30
+    0.002, 0.002, 0.002, 0.002, 0.002,  # Dias 31-35
+    0.001, 0.001, 0.001, 0.001, 0.001,  # Dias 36-40
+    0.001, 0.001, 0.001, 0.001, 0.001,  # Dias 41-45
+    0.001, 0.001, 0.001, 0.001, 0.001   # Dias 46-50
+])
+PERFIL_N2O_VERMI_CERVEJARIA /= PERFIL_N2O_VERMI_CERVEJARIA.sum()
 
+# Emissões pré-descarte ajustadas para cervejaria
+CH4_pre_descarte_ugC_por_kg_h_media = 3.50  # Valor mais alto para resíduos de cervejaria
 fator_conversao_C_para_CH4 = 16/12
 CH4_pre_descarte_ugCH4_por_kg_h_media = CH4_pre_descarte_ugC_por_kg_h_media * fator_conversao_C_para_CH4
 CH4_pre_descarte_g_por_kg_dia = CH4_pre_descarte_ugCH4_por_kg_h_media * 24 / 1_000_000
 
-N2O_pre_descarte_mgN_por_kg = 20.26
+N2O_pre_descarte_mgN_por_kg = 25.0  # Valor mais alto
 N2O_pre_descarte_mgN_por_kg_dia = N2O_pre_descarte_mgN_por_kg / 3
 N2O_pre_descarte_g_por_kg_dia = N2O_pre_descarte_mgN_por_kg_dia * (44/28) / 1000
 
@@ -498,43 +418,42 @@ ano_inicio = datetime.now().year
 data_inicio = datetime(ano_inicio, 1, 1)
 datas = pd.date_range(start=data_inicio, periods=dias, freq='D')
 
-# Perfil temporal N2O (Wang et al. 2017)
 PERFIL_N2O = {1: 0.10, 2: 0.30, 3: 0.40, 4: 0.15, 5: 0.05}
 
-# Valores específicos para compostagem termofílica (Yang et al. 2017) - valores fixos
-CH4_C_FRAC_THERMO = 0.006  # Fixo
-N2O_N_FRAC_THERMO = 0.0196  # Fixo
+# Valores específicos para compostagem termofílica (Yang et al. 2017) - ajustados para cervejaria
+CH4_C_FRAC_THERMO_CERVEJARIA = 0.008  # Ajustado para cervejaria
+N2O_N_FRAC_THERMO_CERVEJARIA = 0.025  # Ajustado para cervejaria
 
-PERFIL_CH4_THERMO = np.array([
-    0.01, 0.02, 0.03, 0.05, 0.08,  # Dias 1-5
-    0.12, 0.15, 0.18, 0.20, 0.18,  # Dias 6-10 (pico termofílico)
-    0.15, 0.12, 0.10, 0.08, 0.06,  # Dias 11-15
-    0.05, 0.04, 0.03, 0.02, 0.02,  # Dias 16-20
-    0.01, 0.01, 0.01, 0.01, 0.01,  # Dias 21-25
+PERFIL_CH4_THERMO_CERVEJARIA = np.array([
+    0.02, 0.03, 0.05, 0.08, 0.12,  # Dias 1-5
+    0.16, 0.20, 0.22, 0.24, 0.22,  # Dias 6-10 (pico termofílico)
+    0.20, 0.18, 0.15, 0.12, 0.10,  # Dias 11-15
+    0.08, 0.06, 0.05, 0.04, 0.03,  # Dias 16-20
+    0.02, 0.02, 0.01, 0.01, 0.01,  # Dias 21-25
     0.005, 0.005, 0.005, 0.005, 0.005,  # Dias 26-30
     0.002, 0.002, 0.002, 0.002, 0.002,  # Dias 31-35
     0.001, 0.001, 0.001, 0.001, 0.001,  # Dias 36-40
     0.001, 0.001, 0.001, 0.001, 0.001,  # Dias 41-45
     0.001, 0.001, 0.001, 0.001, 0.001   # Dias 46-50
 ])
-PERFIL_CH4_THERMO /= PERFIL_CH4_THERMO.sum()
+PERFIL_CH4_THERMO_CERVEJARIA /= PERFIL_CH4_THERMO_CERVEJARIA.sum()
 
-PERFIL_N2O_THERMO = np.array([
-    0.10, 0.08, 0.15, 0.05, 0.03,  # Dias 1-5
-    0.04, 0.05, 0.07, 0.10, 0.12,  # Dias 6-10
-    0.15, 0.18, 0.20, 0.18, 0.15,  # Dias 11-15 (pico termofílico)
-    0.12, 0.10, 0.08, 0.06, 0.05,  # Dias 16-20
-    0.04, 0.03, 0.02, 0.02, 0.01,  # Dias 21-25
+PERFIL_N2O_THERMO_CERVEJARIA = np.array([
+    0.12, 0.10, 0.18, 0.08, 0.05,  # Dias 1-5
+    0.06, 0.08, 0.12, 0.15, 0.18,  # Dias 6-10
+    0.22, 0.25, 0.28, 0.25, 0.22,  # Dias 11-15 (pico termofílico)
+    0.18, 0.15, 0.12, 0.10, 0.08,  # Dias 16-20
+    0.06, 0.05, 0.04, 0.03, 0.02,  # Dias 21-25
     0.01, 0.01, 0.01, 0.01, 0.01,  # Dias 26-30
     0.005, 0.005, 0.005, 0.005, 0.005,  # Dias 31-35
     0.002, 0.002, 0.002, 0.002, 0.002,  # Dias 36-40
     0.001, 0.001, 0.001, 0.001, 0.001,  # Dias 41-45
     0.001, 0.001, 0.001, 0.001, 0.001,   # Dias 46-50
 ])
-PERFIL_N2O_THERMO /= PERFIL_N2O_THERMO.sum()
+PERFIL_N2O_THERMO_CERVEJARIA /= PERFIL_N2O_THERMO_CERVEJARIA.sum()
 
 # =============================================================================
-# FUNÇÕES DE CÁLCULO (ADAPTADAS DO SCRIPT ANEXO)
+# FUNÇÕES DE CÁLCULO - ADAPTADAS PARA CERVEJARIA
 # =============================================================================
 
 def ajustar_emissoes_pre_descarte(O2_concentracao):
@@ -584,8 +503,9 @@ def calcular_emissoes_aterro(params, dias_simulacao=dias):
     emissoes_CH4 = fftconvolve(entradas_diarias, kernel_ch4, mode='full')[:dias_simulacao]
     emissoes_CH4 *= potencial_CH4_lote_diario
 
-    E_aberto = 1.91
-    E_fechado = 2.15
+    # Valores ajustados para resíduos de cervejaria
+    E_aberto = 2.25  # Maior que resíduos genéricos
+    E_fechado = 2.50
     E_medio = f_aberto * E_aberto + (1 - f_aberto) * E_fechado
     E_medio_ajust = E_medio * fator_umid
     emissao_diaria_N2O = (E_medio_ajust * (44/28) / 1_000_000) * residuos_kg_dia
@@ -605,19 +525,19 @@ def calcular_emissoes_vermi(params, dias_simulacao=dias):
     umidade_val, temp_val, doc_val = params
     fracao_ms = 1 - umidade_val
     
-    # Usando valores fixos para CH4_C_FRAC_YANG e N2O_N_FRAC_YANG
-    ch4_total_por_lote = residuos_kg_dia * (TOC_YANG * CH4_C_FRAC_YANG * (16/12) * fracao_ms)
-    n2o_total_por_lote = residuos_kg_dia * (TN_YANG * N2O_N_FRAC_YANG * (44/28) * fracao_ms)
+    # Usando parâmetros específicos para cervejaria
+    ch4_total_por_lote = residuos_kg_dia * (TOC_CERVEJARIA * CH4_C_FRAC_YANG_CERVEJARIA * (16/12) * fracao_ms)
+    n2o_total_por_lote = residuos_kg_dia * (TN_CERVEJARIA * N2O_N_FRAC_YANG_CERVEJARIA * (44/28) * fracao_ms)
 
     emissoes_CH4 = np.zeros(dias_simulacao)
     emissoes_N2O = np.zeros(dias_simulacao)
 
     for dia_entrada in range(dias_simulacao):
-        for dia_compostagem in range(len(PERFIL_CH4_VERMI)):
+        for dia_compostagem in range(len(PERFIL_CH4_VERMI_CERVEJARIA)):
             dia_emissao = dia_entrada + dia_compostagem
             if dia_emissao < dias_simulacao:
-                emissoes_CH4[dia_emissao] += ch4_total_por_lote * PERFIL_CH4_VERMI[dia_compostagem]
-                emissoes_N2O[dia_emissao] += n2o_total_por_lote * PERFIL_N2O_VERMI[dia_compostagem]
+                emissoes_CH4[dia_emissao] += ch4_total_por_lote * PERFIL_CH4_VERMI_CERVEJARIA[dia_compostagem]
+                emissoes_N2O[dia_emissao] += n2o_total_por_lote * PERFIL_N2O_VERMI_CERVEJARIA[dia_compostagem]
 
     return emissoes_CH4, emissoes_N2O
 
@@ -625,19 +545,19 @@ def calcular_emissoes_compostagem(params, dias_simulacao=dias, dias_compostagem=
     umidade, T, DOC = params
     fracao_ms = 1 - umidade
     
-    # Usando valores fixos para CH4_C_FRAC_THERMO e N2O_N_FRAC_THERMO
-    ch4_total_por_lote = residuos_kg_dia * (TOC_YANG * CH4_C_FRAC_THERMO * (16/12) * fracao_ms)
-    n2o_total_por_lote = residuos_kg_dia * (TN_YANG * N2O_N_FRAC_THERMO * (44/28) * fracao_ms)
+    # Usando parâmetros específicos para cervejaria
+    ch4_total_por_lote = residuos_kg_dia * (TOC_CERVEJARIA * CH4_C_FRAC_THERMO_CERVEJARIA * (16/12) * fracao_ms)
+    n2o_total_por_lote = residuos_kg_dia * (TN_CERVEJARIA * N2O_N_FRAC_THERMO_CERVEJARIA * (44/28) * fracao_ms)
 
     emissoes_CH4 = np.zeros(dias_simulacao)
     emissoes_N2O = np.zeros(dias_simulacao)
 
     for dia_entrada in range(dias_simulacao):
-        for dia_compostagem in range(len(PERFIL_CH4_THERMO)):
+        for dia_compostagem in range(len(PERFIL_CH4_THERMO_CERVEJARIA)):
             dia_emissao = dia_entrada + dia_compostagem
             if dia_emissao < dias_simulacao:
-                emissoes_CH4[dia_emissao] += ch4_total_por_lote * PERFIL_CH4_THERMO[dia_compostagem]
-                emissoes_N2O[dia_emissao] += n2o_total_por_lote * PERFIL_N2O_THERMO[dia_compostagem]
+                emissoes_CH4[dia_emissao] += ch4_total_por_lote * PERFIL_CH4_THERMO_CERVEJARIA[dia_compostagem]
+                emissoes_N2O[dia_emissao] += n2o_total_por_lote * PERFIL_N2O_THERMO_CERVEJARIA[dia_compostagem]
 
     return emissoes_CH4, emissoes_N2O
 
@@ -666,14 +586,13 @@ def executar_simulacao_unfccc(parametros):
     return reducao_tco2eq
 
 # =============================================================================
-# EXECUÇÃO DA SIMULAÇÃO
+# EXECUÇÃO DA SIMULAÇÃO - MANTENDO TODOS OS CENÁRIOS
 # =============================================================================
 
-# Executar simulação quando solicitado
 if st.session_state.get('run_simulation', False):
-    with st.spinner('Executando simulação...'):
-        # Executar modelo base COM OS PARÂMETROS ATUALIZADOS DO SIDEBAR
-        params_base = [umidade, temperatura, doc_valor]
+    with st.spinner('Executando simulação completa para cervejaria...'):
+        # Executar modelo base
+        params_base = [umidade, T, DOC]
 
         ch4_aterro_dia, n2o_aterro_dia = calcular_emissoes_aterro(params_base)
         ch4_vermi_dia, n2o_vermi_dia = calcular_emissoes_vermi(params_base)
@@ -739,11 +658,10 @@ if st.session_state.get('run_simulation', False):
         df_comp_anual_revisado.rename(columns={'Total_Compost_tCO2eq_dia': 'Project emissions (t CO₂eq)'}, inplace=True)
 
         # =============================================================================
-        # EXIBIÇÃO DOS RESULTADOS COM COTAÇÃO DO CARBONO E REAL
+        # EXIBIÇÃO DOS RESULTADOS - MANTENDO TODOS OS CENÁRIOS
         # =============================================================================
 
-        # Exibir resultados
-        st.header("📈 Resultados da Simulação")
+        st.header("📈 Resultados da Simulação - Cervejaria")
         
         # Obter valores totais
         total_evitado_tese = df['Reducao_tCO2eq_acum'].iloc[-1]
@@ -763,7 +681,7 @@ if st.session_state.get('run_simulation', False):
         valor_tese_brl = calcular_valor_creditos(total_evitado_tese, preco_carbono, "R$", taxa_cambio)
         valor_unfccc_brl = calcular_valor_creditos(total_evitado_unfccc, preco_carbono, "R$", taxa_cambio)
         
-        # NOVA SEÇÃO: VALOR FINANCEIRO DAS EMISSÕES EVITADAS
+        # SEÇÃO: VALOR FINANCEIRO DAS EMISSÕES EVITADAS
         st.subheader("💰 Valor Financeiro das Emissões Evitadas")
         
         # Primeira linha: Euros
@@ -808,35 +726,7 @@ if st.session_state.get('run_simulation', False):
                 help=f"Baseado em {formatar_br(total_evitado_unfccc)} tCO₂eq evitadas"
             )
         
-        # Explicação sobre compra e venda
-        with st.expander("💡 Como funciona a comercialização no mercado de carbono?"):
-            st.markdown(f"""
-            **📊 Informações de Mercado:**
-            - **Preço em Euro:** {moeda} {preco_carbono:.2f}/tCO₂eq
-            - **Preço em Real:** R$ {formatar_br(preco_carbono * taxa_cambio)}/tCO₂eq
-            - **Taxa de câmbio:** 1 Euro = R$ {taxa_cambio:.2f}
-            - **Fonte:** {fonte_cotacao}
-            
-            **💶 Comprar créditos (compensação):**
-            - Custo em Euro: **{moeda} {formatar_br(valor_tese_eur)}**
-            - Custo em Real: **R$ {formatar_br(valor_tese_brl)}**
-            
-            **💵 Vender créditos (comercialização):**  
-            - Receita em Euro: **{moeda} {formatar_br(valor_tese_eur)}**
-            - Receita em Real: **R$ {formatar_br(valor_tese_brl)}**
-            
-            **🌍 Mercado de Referência:**
-            - European Union Allowances (EUA)
-            - European Emissions Trading System (EU ETS)
-            - Contratos futuros de carbono
-            - Preços em tempo real do mercado regulado
-            """)
-        
-        # =============================================================================
-        # SEÇÃO ATUALIZADA: RESUMO DAS EMISSÕES EVITADAS COM MÉTRICAS ANUAIS REORGANIZADAS
-        # =============================================================================
-        
-        # Métricas de emissões evitadas - layout reorganizado
+        # RESUMO DAS EMISSÕES EVITADAS
         st.subheader("📊 Resumo das Emissões Evitadas")
         
         # Calcular médias anuais
@@ -872,28 +762,6 @@ if st.session_state.get('run_simulation', False):
                 help=f"Emissões evitadas por ano em média"
             )
 
-        # Adicionar explicação sobre as métricas anuais
-        with st.expander("💡 Entenda as métricas anuais"):
-            st.markdown(f"""
-            **📊 Como interpretar as métricas anuais:**
-            
-            **Metodologia da Tese:**
-            - **Total em {anos_simulacao} anos:** {formatar_br(total_evitado_tese)} tCO₂eq
-            - **Média anual:** {formatar_br(media_anual_tese)} tCO₂eq/ano
-            - Equivale a aproximadamente **{formatar_br(media_anual_tese / 365)} tCO₂eq/dia**
-            
-            **Metodologia UNFCCC:**
-            - **Total em {anos_simulacao} anos:** {formatar_br(total_evitado_unfccc)} tCO₂eq
-            - **Média anual:** {formatar_br(media_anual_unfccc)} tCO₂eq/ano
-            - Equivale a aproximadamente **{formatar_br(media_anual_unfccc / 365)} tCO₂eq/dia**
-            
-            **💡 Significado prático:**
-            - As métricas anuais ajudam a planejar projetos de longo prazo
-            - Permitem comparar com metas anuais de redução de emissões
-            - Facilitam o cálculo de retorno financeiro anual
-            - A média anual representa o desempenho constante do projeto
-            """)
-
         # Gráfico comparativo
         st.subheader("📊 Comparação Anual das Emissões Evitadas")
         df_evitadas_anual = pd.DataFrame({
@@ -922,7 +790,7 @@ if st.session_state.get('run_simulation', False):
 
         ax.set_xlabel('Ano')
         ax.set_ylabel('Emissões Evitadas (t CO₂eq)')
-        ax.set_title('Comparação Anual das Emissões Evitadas: Proposta da Tese vs UNFCCC (2012)')
+        ax.set_title('Comparação Anual das Emissões Evitadas: Proposta da Tese vs UNFCCC (2012) - Cervejaria')
         
         # Ajustar o eixo x para ser igual ao do gráfico de redução acumulada
         ax.set_xticks(x)
@@ -940,7 +808,7 @@ if st.session_state.get('run_simulation', False):
         ax.plot(df['Data'], df['Total_Vermi_tCO2eq_acum'], 'g-', label='Projeto (Compostagem em reatores com minhocas)', linewidth=2)
         ax.fill_between(df['Data'], df['Total_Vermi_tCO2eq_acum'], df['Total_Aterro_tCO2eq_acum'],
                         color='skyblue', alpha=0.5, label='Emissões Evitadas')
-        ax.set_title('Redução de Emissões em {} Anos'.format(anos_simulacao))
+        ax.set_title(f'Redução de Emissões em {anos_simulacao} Anos - Cervejaria')
         ax.set_xlabel('Ano')
         ax.set_ylabel('tCO₂eq Acumulado')
         ax.legend()
@@ -959,9 +827,9 @@ if st.session_state.get('run_simulation', False):
             'num_vars': 3,
             'names': ['umidade', 'T', 'DOC'],
             'bounds': [
-                [0.5, 0.85],         # umidade
-                [25.0, 45.0],       # temperatura
-                [0.15, 0.50],       # doc
+                [0.75, 0.90],    # Umidade para cervejaria
+                [20.0, 35.0],    # Temperatura
+                [0.70, 0.90],    # DOC para cervejaria
             ]
         }
 
@@ -977,11 +845,11 @@ if st.session_state.get('run_simulation', False):
 
         fig, ax = plt.subplots(figsize=(10, 6))
         sns.barplot(x='ST', y='Parâmetro', data=sensibilidade_df_tese, palette='viridis', ax=ax)
-        ax.set_title('Sensibilidade Global dos Parâmetros (Índice Sobol Total) - Proposta da Tese')
+        ax.set_title('Sensibilidade Global dos Parâmetros (Índice Sobol Total) - Proposta da Tese - Cervejaria')
         ax.set_xlabel('Índice ST')
         ax.set_ylabel('')
         ax.grid(axis='x', linestyle='--', alpha=0.7)
-        ax.xaxis.set_major_formatter(br_formatter_sobol) # Adiciona formatação ao eixo x
+        ax.xaxis.set_major_formatter(br_formatter_sobol)
         st.pyplot(fig)
 
         # Análise de Sensibilidade Global (Sobol) - CENÁRIO UNFCCC
@@ -993,9 +861,9 @@ if st.session_state.get('run_simulation', False):
             'num_vars': 3,
             'names': ['umidade', 'T', 'DOC'],
             'bounds': [
-                [0.5, 0.85],  # Umidade
-                [25, 45],     # Temperatura
-                [0.15, 0.50], # DOC
+                [0.75, 0.90],    # Umidade para cervejaria
+                [20.0, 35.0],    # Temperatura
+                [0.70, 0.90],    # DOC para cervejaria
             ]
         }
 
@@ -1011,11 +879,11 @@ if st.session_state.get('run_simulation', False):
 
         fig, ax = plt.subplots(figsize=(10, 6))
         sns.barplot(x='ST', y='Parâmetro', data=sensibilidade_df_unfccc, palette='viridis', ax=ax)
-        ax.set_title('Sensibilidade Global dos Parâmetros (Índice Sobol Total) - Cenário UNFCCC')
+        ax.set_title('Sensibilidade Global dos Parâmetros (Índice Sobol Total) - Cenário UNFCCC - Cervejaria')
         ax.set_xlabel('Índice ST')
         ax.set_ylabel('')
         ax.grid(axis='x', linestyle='--', alpha=0.7)
-        ax.xaxis.set_major_formatter(br_formatter_sobol) # Adiciona formatação ao eixo x
+        ax.xaxis.set_major_formatter(br_formatter_sobol)
         st.pyplot(fig)
 
         # Análise de Incerteza (Monte Carlo) - PROPOSTA DA TESE
@@ -1026,7 +894,7 @@ if st.session_state.get('run_simulation', False):
             np.random.seed(50)
             umidade_vals = np.random.uniform(0.75, 0.90, n)
             temp_vals = np.random.normal(25, 3, n)
-            doc_vals = np.random.triangular(0.12, 0.15, 0.18, n)
+            doc_vals = np.random.triangular(0.70, 0.80, 0.90, n)
             
             return umidade_vals, temp_vals, doc_vals
 
@@ -1046,7 +914,7 @@ if st.session_state.get('run_simulation', False):
         ax.axvline(media_tese, color='red', linestyle='--', label=f'Média: {formatar_br(media_tese)} tCO₂eq')
         ax.axvline(intervalo_95_tese[0], color='green', linestyle=':', label='IC 95%')
         ax.axvline(intervalo_95_tese[1], color='green', linestyle=':')
-        ax.set_title('Distribuição das Emissões Evitadas (Simulação Monte Carlo) - Proposta da Tese')
+        ax.set_title('Distribuição das Emissões Evitadas (Simulação Monte Carlo) - Proposta da Tese - Cervejaria')
         ax.set_xlabel('Emissões Evitadas (tCO₂eq)')
         ax.set_ylabel('Frequência')
         ax.legend()
@@ -1061,7 +929,7 @@ if st.session_state.get('run_simulation', False):
             np.random.seed(50)
             umidade_vals = np.random.uniform(0.75, 0.90, n)
             temp_vals = np.random.normal(25, 3, n)
-            doc_vals = np.random.triangular(0.12, 0.15, 0.18, n)
+            doc_vals = np.random.triangular(0.70, 0.80, 0.90, n)
             
             return umidade_vals, temp_vals, doc_vals
 
@@ -1081,7 +949,7 @@ if st.session_state.get('run_simulation', False):
         ax.axvline(media_unfccc, color='red', linestyle='--', label=f'Média: {formatar_br(media_unfccc)} tCO₂eq')
         ax.axvline(intervalo_95_unfccc[0], color='green', linestyle=':', label='IC 95%')
         ax.axvline(intervalo_95_unfccc[1], color='green', linestyle=':')
-        ax.set_title('Distribuição das Emissões Evitadas (Simulação Monte Carlo) - Cenário UNFCCC')
+        ax.set_title('Distribuição das Emissões Evitadas (Simulação Monte Carlo) - Cenário UNFCCC - Cervejaria')
         ax.set_xlabel('Emissões Evitadas (tCO₂eq)')
         ax.set_ylabel('Frequência')
         ax.legend()
@@ -1128,11 +996,23 @@ if st.session_state.get('run_simulation', False):
         st.dataframe(df_comp_formatado)
 
 else:
-    st.info("💡 Ajuste os parâmetros na barra lateral e clique em 'Executar Simulação' para ver os resultados.")
+    st.info("💡 Ajuste os parâmetros da cervejaria na barra lateral e clique em 'Executar Simulação' para ver os resultados.")
 
-# Rodapé
+# Rodapé específico para cervejarias
 st.markdown("---")
 st.markdown("""
+**🍻 Simulador para Cervejarias - Especificações Técnicas:**
+
+**Resíduos Considerados:**
+- Bagaço de malte (trub) 
+- Levedura gasta
+- Efluentes ricos em matéria orgânica
+
+**Parâmetros Ajustados para Cervejaria:**
+- DOC (Carbono Orgânico Degradável): 0.70-0.90
+- Umidade: 75-90% 
+- Alta biodegradabilidade
+- Perfis de decomposição acelerada
 
 **📚 Referências por Cenário:**
 
@@ -1142,9 +1022,15 @@ st.markdown("""
 - Metano e Óxido Nitroso no pré-descarte: Feng et al. (2020)
 
 **Proposta da Tese (Compostagem em reatores com minhocas):**
-- Metano e Óxido Nitroso: Yang et al. (2017)
+- Metano e Óxido Nitroso: Yang et al. (2017) - Parâmetros ajustados para cervejaria
 
 **Cenário UNFCCC (Compostagem sem minhocas a céu aberto):**
 - Protocolo AMS-III.F: UNFCCC (2016)
-- Fatores de emissões: Yang et al. (2017)
+- Fatores de emissões: Yang et al. (2017) - Parâmetros ajustados para cervejaria
+
+**💡 Vantagens para Cervejarias:**
+- Resíduos com alto potencial para geração de créditos de carbono
+- Compostagem como alternativa sustentável
+- Redução significativa de emissões comparado ao aterro
+- Possibilidade de receita adicional com créditos de carbono
 """)
