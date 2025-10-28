@@ -793,11 +793,11 @@ if st.session_state.get('run_simulation', False):
         
         # Área da compostagem tradicional (menor)
         ax.fill_between(df['Data'], df['Total_Compost_tCO2eq_acum'], df['Total_Aterro_tCO2eq_acum'],
-                        color='lightgreen', alpha=0.4, label='Redução - Compostagem Tradicional')
+                        color='lightgreen', alpha=0.6, label='Redução - Compostagem Tradicional')
         
         # Área da vermicompostagem (maior - mais destacada)
         ax.fill_between(df['Data'], df['Total_Vermi_tCO2eq_acum'], df['Total_Aterro_tCO2eq_acum'],
-                        color='lightblue', alpha=0.7, hatch='///', 
+                        color='lightblue', alpha=0.8, 
                         label='Redução - Compostagem com Minhocas (Maior Redução)')
         
         ax.set_title(f'Redução de Emissões Acumulada em {anos_simulacao} Anos - Cervejaria')
@@ -807,22 +807,19 @@ if st.session_state.get('run_simulation', False):
         ax.grid(True, linestyle='--', alpha=0.7)
         ax.yaxis.set_major_formatter(br_formatter)
         
-        # Adicionar anotações para destacar a diferença
+        # Adicionar valores finais como texto no gráfico (sem setas)
         ultimo_ano = df['Data'].iloc[-1]
         reducao_compost = df['Reducao_Compost_tCO2eq_acum'].iloc[-1]
         reducao_vermi = df['Reducao_Vermi_tCO2eq_acum'].iloc[-1]
         
-        ax.annotate(f'Compostagem Tradicional\n{formatar_br(reducao_compost)} tCO₂eq', 
-                   xy=(ultimo_ano, df['Total_Compost_tCO2eq_acum'].iloc[-1]), 
-                   xytext=(10, 30), textcoords='offset points',
-                   bbox=dict(boxstyle='round,pad=0.3', facecolor='lightgreen', alpha=0.7),
-                   arrowprops=dict(arrowstyle='->', connectionstyle='arc3,rad=0'))
+        # Posicionar textos de forma mais limpa
+        ax.text(0.02, 0.25, f'Compostagem Tradicional: {formatar_br(reducao_compost)} tCO₂eq', 
+                transform=ax.transAxes, fontsize=10, color='darkgreen',
+                bbox=dict(boxstyle='round,pad=0.3', facecolor='lightgreen', alpha=0.7))
         
-        ax.annotate(f'Compostagem com Minhocas\n{formatar_br(reducao_vermi)} tCO₂eq', 
-                   xy=(ultimo_ano, df['Total_Vermi_tCO2eq_acum'].iloc[-1]), 
-                   xytext=(10, -40), textcoords='offset points',
-                   bbox=dict(boxstyle='round,pad=0.3', facecolor='lightblue', alpha=0.7),
-                   arrowprops=dict(arrowstyle='->', connectionstyle='arc3,rad=0'))
+        ax.text(0.02, 0.15, f'Compostagem com Minhocas: {formatar_br(reducao_vermi)} tCO₂eq', 
+                transform=ax.transAxes, fontsize=10, color='darkblue',
+                bbox=dict(boxstyle='round,pad=0.3', facecolor='lightblue', alpha=0.7))
         
         st.pyplot(fig)
 
