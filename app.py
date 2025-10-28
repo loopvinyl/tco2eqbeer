@@ -287,12 +287,11 @@ with st.sidebar:
                               min_value=0.10, max_value=0.30, value=0.17, step=0.01,
                               help="Quantidade de resíduos gerados por litro de cerveja produzida")
     
-    # Calcular resíduos automaticamente
+    # CORREÇÃO: Cálculo reativo dos resíduos - usando valores atuais dos sliders
     residuos_kg_dia = (producao_mensal_litros * fator_residuos) / dias_operacao_mes
-    residuos_kg_dia = int(residuos_kg_dia)
     
-    st.info(f"**Resíduos estimados:** {residuos_kg_dia} kg/dia")
-    st.caption(f"*Cálculo: ({producao_mensal_litros} L × {fator_residuos} kg/L) ÷ {dias_operacao_mes} dias = {residuos_kg_dia} kg/dia*")
+    st.info(f"**Resíduos estimados:** {residuos_kg_dia:.1f} kg/dia")
+    st.caption(f"*Cálculo: ({producao_mensal_litros} L × {fator_residuos} kg/L) ÷ {dias_operacao_mes} dias = {residuos_kg_dia:.1f} kg/dia*")
     
     # CORREÇÃO: Massa exposta agora é calculada automaticamente
     massa_exposta_kg = residuos_kg_dia  # Toda a produção diária é exposta
@@ -347,7 +346,7 @@ with st.sidebar:
                          help="Horas diárias de exposição dos resíduos para tratamento")
     
     # Mostrar automaticamente a massa exposta (calculada)
-    st.info(f"**Massa exposta automaticamente calculada:** {massa_exposta_kg} kg/dia")
+    st.info(f"**Massa exposta automaticamente calculada:** {massa_exposta_kg:.1f} kg/dia")
     st.caption("*Baseado na produção diária de resíduos*")
     
     # Expander explicativo sobre os parâmetros
@@ -359,9 +358,9 @@ with st.sidebar:
         - **Produção mensal:** {producao_mensal_litros} litros
         - **Dias de operação:** {dias_operacao_mes} dias/mês
         - **Fator de resíduos:** {fator_residuos} kg/litro
-        - **Resíduos estimados:** {residuos_kg_dia} kg/dia
-        - **Cálculo:** ({producao_mensal_litros} L × {fator_residuos} kg/L) ÷ {dias_operacao_mes} dias = {residuos_kg_dia} kg/dia
-        - **Massa exposta:** {massa_exposta_kg} kg/dia (calculada automaticamente)
+        - **Resíduos estimados:** {residuos_kg_dia:.1f} kg/dia
+        - **Cálculo:** ({producao_mensal_litros} L × {fator_residuos} kg/L) ÷ {dias_operacao_mes} dias = {residuos_kg_dia:.1f} kg/dia
+        - **Massa exposta:** {massa_exposta_kg:.1f} kg/dia (calculada automaticamente)
         - **Composição:** {percentual_bagaco}% bagaço + {percentual_levedura}% levedura
         
         **💧 Umidade:**
