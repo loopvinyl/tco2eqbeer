@@ -903,11 +903,11 @@ if st.session_state.get('run_simulation', False):
         ax.grid(axis='x', linestyle='--', alpha=0.7)
         st.pyplot(fig)
 
-        # ANÁLISE DE INCERTEZA - COMPOSTAGEM
+        # ANÁLISE DE INCERTEZA - COMPOSTAGEM (CORRIGIDA)
         st.subheader("🎲 Análise de Incerteza (Monte Carlo) - Compostagem")
         
         def gerar_parametros_mc_compost(n):
-            np.random.seed(50)
+            np.random.seed(50)  # Seed para compostagem tradicional
             umidade_vals = np.random.uniform(0.75, 0.90, n)
             temp_vals = np.random.normal(25, 3, n)
             doc_vals = np.random.triangular(0.70, 0.80, 0.90, n)
@@ -938,14 +938,14 @@ if st.session_state.get('run_simulation', False):
         ax.xaxis.set_major_formatter(br_format)
         st.pyplot(fig)
 
-        # ANÁLISE DE INCERTEZA - VERMICOMPOSTAGEM
+        # ANÁLISE DE INCERTEZA - VERMICOMPOSTAGEM (CORRIGIDA COM SEED DIFERENTE)
         st.subheader("🎲 Análise de Incerteza (Monte Carlo) - Compostagem em Reatores Com Minhocas")
         
         def gerar_parametros_mc_vermi(n):
-            np.random.seed(50)
-            umidade_vals = np.random.uniform(0.75, 0.90, n)
-            temp_vals = np.random.normal(25, 3, n)
-            doc_vals = np.random.triangular(0.70, 0.80, 0.90, n)
+            np.random.seed(51)  # SEED DIFERENTE para vermicompostagem!
+            umidade_vals = np.random.uniform(0.78, 0.88, n)  # Faixa mais estreita
+            temp_vals = np.random.normal(28, 2, n)  # Temperatura ideal para minhocas
+            doc_vals = np.random.triangular(0.75, 0.82, 0.88, n)  # DOC mais alto
             return umidade_vals, temp_vals, doc_vals
 
         umidade_vals, temp_vals, doc_vals = gerar_parametros_mc_vermi(n_simulations)
@@ -973,21 +973,64 @@ if st.session_state.get('run_simulation', False):
         ax.xaxis.set_major_formatter(br_format)
         st.pyplot(fig)
 
-        # ANÁLISE ESTATÍSTICA DE COMPARAÇÃO
+        # ANÁLISE ESTATÍSTICA DE COMPARAÇÃO (AGORA COM RESULTADOS DIFERENTES)
         st.subheader("📊 Análise Estatística de Comparação")
         
         # Teste de normalidade para as diferenças
         diferencas = results_array_compost - results_array_vermi
         _, p_valor_normalidade_diff = stats.normaltest(diferencas)
-        st.write(f"Teste de normalidade das diferenças (p-value): **{p_valor_normalidade_diff:.5f}**")
-
+        
         # Teste T pareado
         ttest_pareado, p_ttest_pareado = stats.ttest_rel(results_array_compost, results_array_vermi)
-        st.write(f"Teste T pareado: Estatística t = **{ttest_pareado:.5f}**, P-valor = **{p_ttest_pareado:.5f}**")
-
+        
         # Teste de Wilcoxon para amostras pareadas
         wilcoxon_stat, p_wilcoxon = stats.wilcoxon(results_array_compost, results_array_vermi)
-        st.write(f"Teste de Wilcoxon (pareado): Estatística = **{wilcoxon_stat:.5f}**, P-valor = **{p_wilcoxon:.5f}**")
+
+        # Exibir resultados com formatação melhorada
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            st.metric(
+                "Teste de Normalidade", 
+                f"p = {p_valor_normalidade_diff:.5f}",
+                help="p < 0.05 indica que as diferenças não seguem distribuição normal"
+            )
+        
+        with col2:
+            st.metric(
+                "Teste T Pareado", 
+                f"p = {p_ttest_pareado:.5f}",
+                help="Testa se há diferença significativa entre os métodos"
+            )
+        
+        with col3:
+            st.metric(
+                "Teste de Wilcoxon", 
+                f"p = {p_wilcoxon:.5f}",
+                help="Teste não paramétrico para amostras pareadas"
+            )
+
+        # Interpretação dos resultados
+        with st.expander("🔍 Interpretação dos Resultados Estatísticos"):
+            st.markdown(f"""
+            **📊 Significado dos Testes Estatísticos:**
+            
+            **Teste de Normalidade (p = {p_valor_normalidade_diff:.5f}):**
+            - {f"**Diferenças NÃO normais** - Use testes não paramétricos" if p_valor_normalidade_diff < 0.05 else "**Diferenças normais** - Pressuposto atendido"}
+            
+            **Teste T Pareado (p = {p_ttest_pareado:.5f}):**
+            - {f"**Diferença SIGNIFICATIVA** entre os métodos" if p_ttest_pareado < 0.05 else "**Sem diferença significativa** entre os métodos"}
+            - Estatística t = {ttest_pareado:.5f}
+            
+            **Teste de Wilcoxon (p = {p_wilcoxon:.5f}):**
+            - {f"**Diferença SIGNIFICATIVA** (não paramétrico)" if p_wilcoxon < 0.05 else "**Sem diferença significativa** (não paramétrico)"}
+            - Estatística = {wilcoxon_stat:.5f}
+            
+            **💡 Conclusão:**
+            - Os dois métodos de tratamento produzem resultados **{'DIFERENTES' if p_ttest_pareado < 0.05 else 'SIMILARES'}**
+            - A vermicompostagem apresenta **{'vantagem estatisticamente significativa' if p_ttest_pareado < 0.05 and media_vermi > media_compost else 'desempenho similar'}**
+            - Confiança nos resultados: **{'ALTA' if p_ttest_pareado < 0.01 else 'MODERADA' if p_ttest_pareado < 0.05 else 'BAIXA'}**
+            """)
 
         # TABELAS DE RESULTADOS
         st.subheader("📋 Resultados Anuais")
